@@ -42,7 +42,7 @@ object OsmRoadCatalog {
     }
 
     /** Import is atomic: invalid/oversized uploads leave the previous dataset intact. */
-    fun import(context: Context, uri: Uri): Summary {
+    fun importGeoJson(context: Context, uri: Uri): Summary {
         val input = context.contentResolver.openInputStream(uri)
             ?: throw IllegalArgumentException("Không đọc được tệp GeoJSON")
         val bytes = input.use { source ->

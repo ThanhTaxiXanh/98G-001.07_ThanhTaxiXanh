@@ -98,7 +98,7 @@ class MainActivity : FlutterActivity() {
         thread(name = "OsmRoadGeoJsonImport") {
             try {
                 vn.g98g00107.thanhtaxixanh.driver.car.OsmRoadCatalog
-                    .import(this, uri)
+                    .importGeoJson(this, uri)
                 runOnUiThread {
                     pending.success(OsmRoadStatus())
                 }
