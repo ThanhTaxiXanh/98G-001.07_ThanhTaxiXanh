@@ -14,6 +14,8 @@ class MainActivity : FlutterActivity() {
     private var pendingLocationPermission: MethodChannel.Result? = null
     private var pendingRoadImport: MethodChannel.Result? = null
     private var pendingRoadAppend = false
+    private var pendingTrafficImport: MethodChannel.Result? = null
+    private var pendingTrafficAppend = true
     private var phoneMapPreviewFactory: PhoneMapPreviewFactory? = null
 
     private fun locationGranted(): Boolean =
@@ -61,6 +63,49 @@ class MainActivity : FlutterActivity() {
                             ?: mapOf("ready" to false, "status" to "Bản đồ chưa khởi tạo"))
                     } catch (e: Exception) {
                         result.error("PHONE_MAP_COMMAND", e.message, null)
+                    }
+                }
+                "getTrafficPointStatus" -> {
+                    thread(name = "TrafficPointStatus") {
+                        try {
+                            val status = vn.g98g00107.thanhtaxixanh.driver.car.TrafficPointStore
+                                .status(applicationContext)
+                            runOnUiThread { result.success(status) }
+                        } catch (e: Exception) {
+                            runOnUiThread { result.error("TRAFFIC_STATUS", e.message, null) }
+                        }
+                    }
+                }
+                "clearTrafficPoints" -> {
+                    thread(name = "TrafficPointClear") {
+                        try {
+                            val status = vn.g98g00107.thanhtaxixanh.driver.car.TrafficPointStore
+                                .clear(applicationContext)
+                            runOnUiThread { result.success(status) }
+                        } catch (e: Exception) {
+                            runOnUiThread { result.error("TRAFFIC_CLEAR", e.message, null) }
+                        }
+                    }
+                }
+                "importTrafficPointGeoJson" -> {
+                    if (pendingTrafficImport != null) {
+                        result.error("ALREADY_IMPORTING", "Đang chọn một tệp biển báo", null)
+                    } else {
+                        pendingTrafficImport = result
+                        pendingTrafficAppend = call.argument<Boolean>("append") != false
+                        try {
+                            val picker = Intent(Intent.ACTION_OPEN_DOCUMENT)
+                                .addCategory(Intent.CATEGORY_OPENABLE)
+                                .setType("*/*")
+                                .putExtra(Intent.EXTRA_MIME_TYPES, arrayOf(
+                                    "application/geo+json", "application/json",
+                                    "text/plain", "application/octet-stream"
+                                ))
+                            startActivityForResult(picker, TRAFFIC_POINT_IMPORT_REQUEST)
+                        } catch (e: Exception) {
+                            pendingTrafficImport = null
+                            result.error("PICKER_UNAVAILABLE", e.message, null)
+                        }
                     }
                 }
                 "getRoadDataStatus" -> {
@@ -165,6 +210,30 @@ class MainActivity : FlutterActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == TRAFFIC_POINT_IMPORT_REQUEST) {
+            val pending = pendingTrafficImport ?: return
+            pendingTrafficImport = null
+            val append = pendingTrafficAppend
+            pendingTrafficAppend = true
+            val uri = if (resultCode == Activity.RESULT_OK) data?.data else null
+            if (uri == null) {
+                pending.success(null)
+                return
+            }
+            thread(name = "TrafficPointGeoJsonImport") {
+                try {
+                    val status = vn.g98g00107.thanhtaxixanh.driver.car.TrafficPointStore
+                        .importGeoJson(applicationContext, uri, append)
+                    runOnUiThread { pending.success(status) }
+                } catch (e: Exception) {
+                    runOnUiThread {
+                        pending.error("INVALID_TRAFFIC_GEOJSON",
+                            e.message ?: "Dữ liệu biển báo không hợp lệ", null)
+                    }
+                }
+            }
+            return
+        }
         if (requestCode != ROAD_IMPORT_REQUEST) return
         val pending = pendingRoadImport ?: return
         pendingRoadImport = null
@@ -235,6 +304,9 @@ class MainActivity : FlutterActivity() {
         pendingLocationPermission?.error(
             "ACTIVITY_CLOSED", "Phone activity was closed during permission request", null)
         pendingLocationPermission = null
+        pendingTrafficImport?.error(
+            "ACTIVITY_CLOSED", "Đã đóng màn hình khi chọn tệp biển báo", null)
+        pendingTrafficImport = null
         super.onDestroy()
     }
 
@@ -243,5 +315,6 @@ class MainActivity : FlutterActivity() {
             "vn.g98g00107.thanhtaxixanh.driver.CONFIG_CHANGED"
         private const val LOCATION_PERMISSION_CODE = 4281
         private const val ROAD_IMPORT_REQUEST = 4282
+        private const val TRAFFIC_POINT_IMPORT_REQUEST = 4283
     }
 }
