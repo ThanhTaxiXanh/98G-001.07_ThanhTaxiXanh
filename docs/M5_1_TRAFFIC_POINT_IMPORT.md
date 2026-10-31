@@ -44,6 +44,12 @@ Ví dụ schema (tọa độ **giả lập**, không được import để lái 
 }
 ```
 
+## Công cụ chuyển Overpass GeoJSON trên điện thoại
+
+Mở tệp [tools/overpass_traffic_converter.html](../tools/overpass_traffic_converter.html) (nên tải về và mở trên trình duyệt ở điện thoại). Công cụ JavaScript chạy tại máy, không cần API/đăng nhập; người dùng tự xác nhận GeoJSON là dữ liệu từ OSM trước khi gán thông tin giấy phép ODbL. Nó chỉ nhận điểm có tag rõ ràng, không đoán biển từ `LineString` hoặc mã `traffic_sign` chưa hiểu. Chọn tệp GeoJSON đã xuất ở Overpass Turbo, bấm chuyển đổi, tải tệp `ThanhTaxiXanh_OSM_M5_1_UNVERIFIED.geojson` rồi nhập trong ứng dụng. Nếu trình duyệt di động chặn mở HTML địa phương, có thể dùng trình duyệt khác hỗ trợ mở tệp hoặc chạy trong môi trường host tĩnh do người dùng kiểm soát; **không yêu cầu tải dữ liệu lên bên thứ ba**.
+
+**Lưu ý:** `sourceRef` là dấu vết OSM do tệp chứa, không phải xác nhận đã khảo sát biển. `direction` OSM có thể mô tả hướng mặt biển, không chuyển thành góc chạy xe.
+
 ## Trên điện thoại Android (không cần máy tính)
 
 1. Chuẩn bị GeoJSON **đã có tọa độ thực tế và nguồn hợp lệ**, không phải ảnh bộ phát hiện biển báo. Có thể bắt đầu từ OSM `node[traffic_sign]` theo **một vùng nhỏ** và chuyển đổi thủ công hoặc bằng công cụ kiểm tra về schema bên trên; không tự gán các mã biển không hiểu.
