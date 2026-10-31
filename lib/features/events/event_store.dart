@@ -24,7 +24,9 @@ class CalendarEventStore extends ChangeNotifier {
       final raw = (await _prefs()).getString(storageKey);
       if (raw != null && raw.isNotEmpty) {
         final decoded = jsonDecode(raw);
-        if (decoded is! List) throw const FormatException('Events must be a list');
+        if (decoded is! List) {
+          throw const FormatException('Events must be a list');
+        }
         final restored = <CalEvent>[];
         for (final entry in decoded) {
           if (entry is! Map<String, dynamic>) {
