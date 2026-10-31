@@ -248,6 +248,49 @@ class _SettingsHomeState extends State<SettingsHome> {
     }
   }
 
+  Map<String, dynamic>? restrictionImportReport;
+
+  Future<void> _importOsmTurnRestrictions() async {
+    if (roadBusy) return;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Nhập quan hệ cấm rẽ OSM?'),
+        content: const Text(
+          'Chọn GeoJSON quan hệ OSM đã chuẩn hóa. Tệp hợp lệ sẽ thay toàn bộ '
+          'bản lưu cấm rẽ trước đó. Dữ liệu chỉ để rà soát, chưa dùng cảnh báo.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false),
+              child: const Text('Hủy')),
+          FilledButton(onPressed: () => Navigator.pop(context, true),
+              child: const Text('Chọn tệp')),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    setState(() {
+      roadBusy = true;
+      roadError = '';
+    });
+    try {
+      final report = await locationChannel.invokeMapMethod<String, dynamic>(
+        'importOsmTurnRestrictions');
+      if (mounted && report != null) {
+        setState(() {
+          restrictionImportReport = Map<String, dynamic>.from(report);
+        });
+      }
+    } on MissingPluginException {
+      if (mounted) setState(() => roadError = 'Chỉ hỗ trợ trên Android.');
+    } on PlatformException catch (e) {
+      if (mounted) {
+        setState(() => roadError = e.message ?? 'Nhập quan hệ cấm rẽ thất bại');
+      }
+    } finally {
+      if (mounted) setState(() => roadBusy = false);
+    }
+  }
+
   Future<void> _reviewGpxTrack() async {
     if (roadBusy) {
       return;
@@ -638,6 +681,14 @@ class _SettingsHomeState extends State<SettingsHome> {
       icon: const Icon(Icons.account_tree_outlined),
       label: const Text('Nhập GeoJSON có OSM Node ID (thay toàn bộ)'),
     ),
+    OutlinedButton.icon(
+      onPressed: roadBusy ? null : () => unawaited(_importOsmTurnRestrictions()),
+      icon: const Icon(Icons.rule_folder_outlined),
+      label: const Text('Nhập quan hệ cấm rẽ OSM (GeoJSON)'),
+    ),
+    if (restrictionImportReport != null)
+      Text('Quan hệ cấm rẽ đã lưu: ${restrictionImportReport!['relations']} · '
+          'Chưa xác minh, không dùng để cảnh báo.'),
     OutlinedButton.icon(
       onPressed: roadBusy ? null : () => unawaited(_reviewGpxTrack()),
       icon: const Icon(Icons.route_outlined),
