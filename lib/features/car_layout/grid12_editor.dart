@@ -18,13 +18,15 @@ class _Grid12EditorState extends State<Grid12Editor> {
   Grid12Layout? preview, original;
   GridTile? activeTile;
   Offset? start;
+  Offset? downPosition;
   bool resize = false, rejected = false;
   double w = 1, h = 1;
 
   Grid12Layout get value => preview ?? widget.layout;
 
   void begin(DragStartDetails d) {
-    final p = d.localPosition;
+    // PanStart fires after touch slop; preserve first touch for resize handles.
+    final p = downPosition ?? d.localPosition;
     final tile = value.tiles.reversed.where((t) =>
         Grid12Geometry.bounds(t, w, h).contains(p.dx, p.dy)).firstOrNull;
     if (tile == null) {
@@ -77,6 +79,7 @@ class _Grid12EditorState extends State<Grid12Editor> {
     setState(() {
       preview = null; original = null; activeTile = null; start = null;
       rejected = false;
+      downPosition = null;
     });
   }
 
@@ -89,6 +92,7 @@ class _Grid12EditorState extends State<Grid12Editor> {
       return GestureDetector(
         key: const Key('grid12-editor'),
         behavior: HitTestBehavior.opaque,
+        onPanDown: (d) => downPosition = d.localPosition,
         onPanStart: begin, onPanUpdate: update,
         onPanEnd: (_) => end(), onPanCancel: end,
         onTapUp: (d) {
