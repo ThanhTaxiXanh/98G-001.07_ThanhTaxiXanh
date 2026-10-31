@@ -425,6 +425,46 @@ object OsmRoadSqliteStore {
         }
     }
 
+    /** M5.3G: read ONLY explicitly linked topology rows; never infer node IDs.
+     * This is a bounded offline review API, not a verified speed source.
+     */
+    @Synchronized
+    fun topologyGraph(context: Context, limit: Int = 50_000):
+        OsmTopologyGraphBuilder.Build {
+        require(limit in 1..50_000)
+        val db = database(context)
+        try {
+            val segments = ArrayList<OsmTopologyGraphBuilder.Segment>()
+            db.rawQuery("""
+                SELECT r.id, t.from_osm_node, t.to_osm_node, t.osm_way_id,
+                       r.lat1, r.lon1, r.lat2, r.lon2, r.oneway
+                FROM road_topology AS t
+                JOIN roads AS r ON r.id = t.road_id
+                ORDER BY r.id LIMIT ?
+            """.trimIndent(), arrayOf((limit + 1).toString())).use { cursor ->
+                while (cursor.moveToNext()) {
+                    require(segments.size < limit) {
+                        "Topology exceeds review limit; refusing truncated graph"
+                    }
+                    val lat1 = cursor.getDouble(4)
+                    val lon1 = cursor.getDouble(5)
+                    val lat2 = cursor.getDouble(6)
+                    val lon2 = cursor.getDouble(7)
+                    val meanLat = (lat1 + lat2) / 2.0 * PI / 180.0
+                    val north = (lat2 - lat1) * 111_195.0
+                    val east = (lon2 - lon1) * 111_195.0 * cos(meanLat)
+                    val lengthM = kotlin.math.hypot(north, east)
+                    segments.add(OsmTopologyGraphBuilder.Segment(
+                        cursor.getLong(0), cursor.getString(1), cursor.getString(2),
+                        cursor.getString(3), lengthM, cursor.getInt(8)))
+                }
+            }
+            return OsmTopologyGraphBuilder.build(segments)
+        } finally {
+            db.close()
+        }
+    }
+
     /**
      * RTree prefilter for a 30m vicinity. If >128 segments intersect the box,
      * return no candidates instead of silently truncating ambiguous roads.
