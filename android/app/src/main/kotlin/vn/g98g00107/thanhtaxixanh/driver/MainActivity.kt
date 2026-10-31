@@ -295,7 +295,13 @@ class MainActivity : FlutterActivity() {
                         .parse(bytes.toString(Charsets.UTF_8))
                     val motion = vn.g98g00107.thanhtaxixanh.driver.car.GpxMotionEstimator
                         .enrich(parsed)
+                    val coverage = vn.g98g00107.thanhtaxixanh.driver.car
+                        .GpxOsmCoverageReview.inspectOffline(applicationContext, motion.fixes)
                     val summary = mapOf(
+                        "coverageCandidate" to coverage.candidatePoints,
+                        "coverageMissing" to coverage.noRoadPoints,
+                        "coverageOverloaded" to coverage.overloadedPoints,
+                        "coverageAmbiguous" to coverage.ambiguousPoints,
                         "status" to "UNVERIFIED_REVIEW_ONLY",
                         "points" to parsed.fixes.size,
                         "rejected" to parsed.rejectedPoints,
