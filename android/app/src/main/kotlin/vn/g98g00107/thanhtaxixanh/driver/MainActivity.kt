@@ -14,6 +14,7 @@ class MainActivity : FlutterActivity() {
     private var pendingLocationPermission: MethodChannel.Result? = null
     private var pendingRoadImport: MethodChannel.Result? = null
     private var pendingRoadAppend = false
+    private var phoneMapPreviewFactory: PhoneMapPreviewFactory? = null
 
     private fun locationGranted(): Boolean =
         checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
@@ -23,6 +24,11 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        phoneMapPreviewFactory = PhoneMapPreviewFactory(this)
+        flutterEngine.platformViewsController.registry.registerViewFactory(
+            "vn.g98g00107.thanhtaxixanh.driver/phone-map-view",
+            phoneMapPreviewFactory!!
+        )
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             "vn.g98g00107.thanhtaxixanh.driver/config"
@@ -33,6 +39,16 @@ class MainActivity : FlutterActivity() {
                     result.success(null)
                 }
                 "getLocationPermission" -> result.success(locationGranted())
+                "phoneMapPreviewCommand" -> {
+                    try {
+                        val action = call.argument<String>("action") ?: "status"
+                        val enabled = call.argument<Boolean>("enabled")
+                        result.success(phoneMapPreviewFactory?.command(action, enabled)
+                            ?: mapOf("ready" to false, "status" to "Bản đồ chưa khởi tạo"))
+                    } catch (e: Exception) {
+                        result.error("PHONE_MAP_COMMAND", e.message, null)
+                    }
+                }
                 "getRoadDataStatus" -> {
                     thread(name = "RoadDbStatus") {
                         try {
@@ -174,7 +190,34 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        phoneMapPreviewFactory?.onStart()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        phoneMapPreviewFactory?.onResume()
+    }
+
+    override fun onPause() {
+        phoneMapPreviewFactory?.onPause()
+        super.onPause()
+    }
+
+    override fun onStop() {
+        phoneMapPreviewFactory?.onStop()
+        super.onStop()
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        phoneMapPreviewFactory?.onLowMemory()
+    }
+
     override fun onDestroy() {
+        phoneMapPreviewFactory?.dispose()
+        phoneMapPreviewFactory = null
         pendingLocationPermission?.error(
             "ACTIVITY_CLOSED", "Phone activity was closed during permission request", null)
         pendingLocationPermission = null
