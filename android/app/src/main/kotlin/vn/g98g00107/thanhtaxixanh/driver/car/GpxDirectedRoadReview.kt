@@ -12,6 +12,7 @@ object GpxDirectedRoadReview {
     data class Report(val points: Int, val matched: Int, val missing: Int,
                       val ambiguous: Int, val disconnected: Int,
                       val invalidHeading: Int = 0, val implausibleTime: Int = 0,
+                      val prohibitedTurn: Int = 0,
                       val status: String = "UNVERIFIED_REVIEW_ONLY")
 
     data class Road(val id: Long, val lat1: Double, val lon1: Double,
@@ -34,7 +35,8 @@ object GpxDirectedRoadReview {
     fun inspect(
         fixes: List<GpsTraceRoadReview.Fix>,
         graph: OsmTopologyGraphBuilder.Build,
-        candidates: (GpsTraceRoadReview.Fix) -> List<Road>?
+        candidates: (GpsTraceRoadReview.Fix) -> List<Road>?,
+        restrictions: Set<DirectedRoadGraph.TurnRestriction> = emptySet()
     ): Report {
         require(fixes.size <= 5000)
         val byRoad = graph.edges.groupBy { it.id.substringBefore(':') }
@@ -46,6 +48,7 @@ object GpxDirectedRoadReview {
         var previousFix: GpsTraceRoadReview.Fix? = null
         var invalidHeading = 0
         var implausibleTime = 0
+        var prohibitedTurn = 0
         for (fix in fixes) {
             if (fix.heading == null || fix.accuracyM !in 0.0..25.0) {
                 missing++
@@ -102,9 +105,19 @@ object GpxDirectedRoadReview {
             if (previous != null && previous != roadId) {
                 val before = byRoad[previous].orEmpty()
                 val connected = before.any { a ->
-                    current.any { b -> a.toNode == b.fromNode }
+                    current.any { b ->
+                        GpxTurnRestrictionAudit.evaluate(a, b, restrictions)
+                            .permittedByKnownRestrictions
+                    }
                 }
                 if (!connected) {
+                    val hasRestrictedTurn = before.any { a ->
+                        current.any { b ->
+                            GpxTurnRestrictionAudit.evaluate(a, b, restrictions)
+                                .reason == "EXPLICIT_TURN_RESTRICTION"
+                        }
+                    }
+                    if (hasRestrictedTurn) prohibitedTurn++
                     disconnected++
                     previous = null
                     continue
@@ -115,7 +128,7 @@ object GpxDirectedRoadReview {
             previousFix = fix
         }
         return Report(fixes.size,matched,missing,ambiguous,disconnected,
-            invalidHeading,implausibleTime)
+            invalidHeading,implausibleTime,prohibitedTurn)
     }
 
     fun inspectOffline(context: Context, fixes: List<GpsTraceRoadReview.Fix>): Report {
