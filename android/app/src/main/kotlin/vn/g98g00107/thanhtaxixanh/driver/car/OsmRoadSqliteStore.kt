@@ -106,6 +106,8 @@ object OsmRoadSqliteStore {
 
     @Synchronized
     fun importGeoJson(context: Context, uri: Uri, append: Boolean = false): Summary {
+        // Preserve any older M3 GeoJSON region before extending the M4 dataset.
+        if (append) migrateLegacy(context)
         val bytes = context.contentResolver.openInputStream(uri)?.use { stream ->
             val buffer = ByteArray(16_384)
             val out = ByteArrayOutputStream()

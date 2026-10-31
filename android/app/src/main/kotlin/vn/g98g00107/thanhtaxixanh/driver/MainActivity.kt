@@ -118,8 +118,10 @@ class MainActivity : FlutterActivity() {
             try {
                 vn.g98g00107.thanhtaxixanh.driver.car.OsmRoadSqliteStore
                     .importGeoJson(applicationContext, uri, append)
+                // SQLite must finish on the worker, not inside the UI callback.
+                val status = OsmRoadStatus()
                 runOnUiThread {
-                    pending.success(OsmRoadStatus())
+                    pending.success(status)
                 }
             } catch (e: Exception) {
                 runOnUiThread {
