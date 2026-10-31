@@ -41,16 +41,26 @@ object OsmRoadSqliteStore {
             """.trimIndent())
             db.execSQL("CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
             // Some Android ROMs and Robolectric SQLite builds omit SQLITE_ENABLE_RTREE.
-            // Preserve a correct (but slower) indexed bounding-box query on those devices.
+            // A failed CREATE VIRTUAL TABLE may still reserve the table name on some
+            // SQLite implementations, so ROLLBACK the DDL using a nested SAVEPOINT.
+            db.execSQL("SAVEPOINT road_index_probe")
+            var useRtree = false
             try {
                 db.execSQL("""
                     CREATE VIRTUAL TABLE road_rtree USING rtree(
                         id, min_lat, max_lat, min_lon, max_lon
                     )
                 """.trimIndent())
-                db.execSQL("INSERT INTO metadata(key,value) VALUES('indexType','RTree')")
+                db.execSQL("RELEASE SAVEPOINT road_index_probe")
+                useRtree = true
             } catch (e: SQLiteException) {
                 Log.w("ThanhTaxiRoadDb", "RTree unavailable; use B-tree bbox fallback", e)
+                db.execSQL("ROLLBACK TO SAVEPOINT road_index_probe")
+                db.execSQL("RELEASE SAVEPOINT road_index_probe")
+            }
+            if (useRtree) {
+                db.execSQL("INSERT INTO metadata(key,value) VALUES('indexType','RTree')")
+            } else {
                 db.execSQL("""
                     CREATE TABLE road_rtree(
                         id INTEGER PRIMARY KEY,
