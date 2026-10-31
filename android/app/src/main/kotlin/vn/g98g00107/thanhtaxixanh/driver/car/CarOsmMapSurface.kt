@@ -59,6 +59,7 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var matchSequence = 0
     private var roadDataError: String? = null
+    private var lastDashboardDiagnostic: String? = null
 
 
     private val locationListener = object : LocationListener {
@@ -123,6 +124,7 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
         lastLocation = null
         roadMatch = null
         roadDataError = null
+        lastDashboardDiagnostic = null
         targetSurface = container.surface
         width = container.width
         height = container.height
@@ -274,14 +276,18 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
             lastMap?.takeIf { !it.isRecycled }?.let {
                 canvas.drawBitmap(it, null, mapArea, Paint(Paint.FILTER_BITMAP_FLAG))
             }
-            if (dashboard) {
-                drawDashboardTiles(canvas, safeViewport.bounds)
-                Log.d(tag, "AA dashboard rendered in safe viewport " +
-                    safeViewport.bounds.toShortString())
-            } else {
-                Log.d(tag, "AA dashboard hidden: safe=" + safeViewport.overlaySafe +
-                    " viewport=" + safeViewport.bounds.toShortString() +
-                    " warning=" + safeViewport.warning)
+            if (dashboard) drawDashboardTiles(canvas, safeViewport.bounds)
+            val dashboardDiagnostic = if (dashboard) "visible" else when {
+                !safeViewport.overlaySafe -> "hostInsetsUnknown"
+                safeViewport.bounds.width() < 280 -> "safeWidthTooSmall"
+                else -> "safeHeightTooSmall"
+            }
+            if (dashboardDiagnostic != lastDashboardDiagnostic) {
+                lastDashboardDiagnostic = dashboardDiagnostic
+                CarSurfaceTelemetry.record(context, "dashboardState", width, height,
+                    visible, stable, extra = dashboardDiagnostic)
+                Log.i(tag, "Dashboard state: " + dashboardDiagnostic +
+                    ", safe=" + safeViewport.bounds.toShortString())
             }
             // Always render the map to the host Surface. If the host has not
             // provided reliable insets, do NOT put speed/HUD above host chrome.
