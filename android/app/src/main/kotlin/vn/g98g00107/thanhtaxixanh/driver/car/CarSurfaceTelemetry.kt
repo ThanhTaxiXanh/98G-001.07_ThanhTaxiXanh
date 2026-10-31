@@ -35,20 +35,28 @@ object CarSurfaceTelemetry {
 
     @Synchronized
     fun record(context: Context, event: String, width: Int, height: Int,
-               visible: Rect?, stable: Rect?, extra: String? = null) {
+               visible: Rect?, stable: Rect?, extra: String? = null,
+               dpi: Int? = null) {
         val report = read(context)
-        val safe = CarSurfaceViewport.compute(width, height, visible, stable)
         val now = System.currentTimeMillis()
         report.put("version", 1)
         report.put("lastObservedAt", now)
         report.put("lastEvent", event)
-        report.put("surfaceWidth", width.coerceAtLeast(0))
-        report.put("surfaceHeight", height.coerceAtLeast(0))
-        report.put("visible", objectOrNull(safe.visibleArea) ?: JSONObject.NULL)
-        report.put("stable", objectOrNull(safe.stableArea) ?: JSONObject.NULL)
-        report.put("safe", objectOrNull(safe.bounds) ?: JSONObject.NULL)
-        report.put("overlaySafe", safe.overlaySafe)
-        report.put("warning", safe.warning ?: JSONObject.NULL)
+        // Preserve the last REAL host geometry after Screen is destroyed:
+        // a sessionStopped callback has no Surface and must not replace it
+        // with a fictional 0x0 screen.
+        if (width > 0 && height > 0) {
+            val safe = CarSurfaceViewport.compute(width, height, visible, stable)
+            report.put("surfaceWidth", width)
+            report.put("surfaceHeight", height)
+            report.put("surfaceAspectRatio", width.toDouble() / height)
+            report.put("visible", objectOrNull(safe.visibleArea) ?: JSONObject.NULL)
+            report.put("stable", objectOrNull(safe.stableArea) ?: JSONObject.NULL)
+            report.put("safe", objectOrNull(safe.bounds) ?: JSONObject.NULL)
+            report.put("overlaySafe", safe.overlaySafe)
+            report.put("warning", safe.warning ?: JSONObject.NULL)
+        }
+        if (dpi != null) report.put("surfaceDpi", dpi.coerceAtLeast(0))
         report.put("lastFrameAt", report.optLong("lastFrameAt", 0L))
         val eventCount = report.optLong("eventCount", 0L) + 1L
         report.put("eventCount", eventCount)

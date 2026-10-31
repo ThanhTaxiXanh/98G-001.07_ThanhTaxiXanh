@@ -31,7 +31,8 @@ class CarSurfaceTelemetryTest {
     }
 
     @Test fun remembersHostRectanglesWithoutGpsOrQr() {
-        CarSurfaceTelemetry.record(context, "surfaceAvailable", 1000, 600, null, null)
+        CarSurfaceTelemetry.record(context, "surfaceAvailable", 1000, 600,
+            null, null, dpi = 160)
         CarSurfaceTelemetry.record(context, "visibleAreaChanged", 1000, 600,
             Rect(30, 0, 950, 550), null)
         CarSurfaceTelemetry.record(context, "stableAreaChanged", 1000, 600,
@@ -39,6 +40,8 @@ class CarSurfaceTelemetryTest {
         val r = report()
         assertEquals(1000, r.getInt("surfaceWidth"))
         assertEquals(600, r.getInt("surfaceHeight"))
+        assertEquals(160, r.getInt("surfaceDpi"))
+        assertEquals(1000.0 / 600.0, r.getDouble("surfaceAspectRatio"), 0.0001)
         assertEquals(75, r.getJSONObject("safe").getInt("left"))
         assertEquals(25, r.getJSONObject("safe").getInt("top"))
         assertTrue(r.getBoolean("overlaySafe"))
@@ -51,7 +54,10 @@ class CarSurfaceTelemetryTest {
     @Test fun tracksDetachWithoutClaimingLiveConnection() {
         CarSurfaceTelemetry.record(context, "surfaceAvailable", 800, 480, null, null)
         CarSurfaceTelemetry.record(context, "surfaceDestroyed", 800, 480, null, null)
+        CarSurfaceTelemetry.record(context, "sessionStopped", 0, 0, null, null)
         assertFalse(report().getBoolean("lastObservedSurfaceActive"))
+        assertEquals(800, report().getInt("surfaceWidth"))
+        assertEquals(480, report().getInt("surfaceHeight"))
         assertEquals(1, report().getInt("surfacesDestroyed"))
     }
 

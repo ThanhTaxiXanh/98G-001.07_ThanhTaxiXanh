@@ -124,7 +124,7 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
         width = container.width
         height = container.height
         CarSurfaceTelemetry.record(context, "surfaceAvailable", width, height,
-            visible, stable)
+            visible, stable, dpi = container.dpi)
         Log.i(tag, "OSM surface " + width + "x" + height)
         if (width < 32 || height < 32 || targetSurface?.isValid != true) return
         drawFrame()

@@ -135,6 +135,10 @@ class _CarSurfaceDiagnosticsPanelState
       _line('Sự kiện cuối', '${report['lastEvent'] ?? 'Chưa có'}'),
       _line('Surface', '${report['surfaceWidth'] ?? '--'} × '
           '${report['surfaceHeight'] ?? '--'} px'),
+      _line('Mật độ host (DPI)', '${report['surfaceDpi'] ?? 'Chưa nhận'}'),
+      _line('Tỷ lệ Surface', report['surfaceAspectRatio'] is num
+          ? (report['surfaceAspectRatio'] as num).toStringAsFixed(3)
+          : 'Chưa nhận'),
       _line('Visible Area', _rect(report['visible'])),
       _line('Stable Area', _rect(report['stable'])),
       _line('Safe Area', _rect(report['safe'])),
