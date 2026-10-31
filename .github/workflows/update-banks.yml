@@ -1,0 +1,13 @@
+name: Update VietQR banks snapshot
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          echo "No snapshot auto-commit: bank API/schema/license must be audited first."
+          echo "This workflow is informational until an independently validated updater is merged."
