@@ -321,8 +321,10 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
             // provided reliable insets, do NOT put speed/HUD above host chrome.
             if (!safeViewport.overlaySafe || safeViewport.bounds.width() < 180 ||
                 safeViewport.bounds.height() < 140) return
-            val area = safeViewport.bounds
-            val scale = (minOf(width, height) / 680f).coerceIn(0.60f, 1.35f)
+            val area = mapArea
+            canvas.save()
+            canvas.clipRect(area)
+            val scale = (minOf(area.width(), area.height()) / 680f).coerceIn(0.45f, 1.1f)
             val label = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.WHITE
                 textSize = 23f * scale
@@ -365,6 +367,7 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
                 footY + 9f, 6f, 6f, bg)
             secondary.textSize = 14f * scale
             canvas.drawText(foot, area.left + 13f, footY, secondary)
+            canvas.restore()
         } catch (e: Exception) {
             Log.w(tag, "Unable to draw host surface", e)
         } finally {
@@ -397,8 +400,14 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
         val names = mapOf("calendar" to "LỊCH VIỆT NAM",
             "qr" to "MÃ QR THANH TOÁN", "media" to "MEDIA",
             "icons" to "TX")
+        val today = LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))
+        val lunar = LunarCalendar.solarToLunar(today.dayOfMonth,
+            today.monthValue, today.year)
+        val lunarSuffix = if (lunar.leap) " nhuận" else ""
         val details = mapOf("calendar" to
-            LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),
+            ("${today.dayOfMonth}/${today.monthValue}/${today.year}  ·  " +
+            "ÂL ${lunar.day}/${lunar.month}${lunarSuffix}  " +
+            LunarCalendar.canChi(lunar.year)),
             "qr" to "Chưa chọn ảnh QR", "media" to "Chưa kết nối trình phát")
         for (tile in currentTiles) {
             if (tile.name == "map") continue
