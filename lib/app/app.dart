@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../features/car_layout/layout_config.dart';
+import '../features/car_layout/grid12_layout.dart';
+import '../features/car_layout/grid12_editor.dart';
 import '../features/car_layout/layout_store.dart';
 import '../features/car_preview/car_preview.dart';
 import '../features/payments/vietqr.dart';
@@ -48,6 +50,8 @@ class SettingsHome extends StatefulWidget {
 }
 class _SettingsHomeState extends State<SettingsHome> {
   int tab = 0;
+  Grid12Layout? draftLayout;
+  String layoutError = '';
   final bin = TextEditingController();
   final account = TextEditingController();
   final holder = TextEditingController();
@@ -373,10 +377,83 @@ class _SettingsHomeState extends State<SettingsHome> {
   );
   Widget _layoutPage(CarLayoutConfig c) => _scroll([
     _section('Bố cục màn hình Android Auto'),
-    const Text('Điện thoại chỉ dùng cài đặt và xem trước. '
-        'Bố cục mục tiêu trên xe chưa được xác minh.'),
-    const SizedBox(height: 12),
-    CarPreview(config: c, vietQrPayload: qrPayload),
+    const Text('Chỉnh bố cục trên điện thoại, không phải giao diện '
+        'Android Auto đã được phép phát hành.'),
+    const SizedBox(height: 10),
+    CarPreview(
+      config: draftLayout == null ? c :
+          c.copyWith(customLayout: draftLayout, useCustomLayout: true),
+      vietQrPayload: qrPayload,
+    ),
+    _section('Chọn một trong 8 bố cục'),
+    DropdownButton<String>(
+      key: const Key('grid12-preset-picker'),
+      isExpanded: true,
+      value: c.useCustomLayout && c.customLayout != null
+          ? 'custom' : c.layoutPresetId,
+      items: [
+        for (final p in Grid12Presets.all)
+          DropdownMenuItem(value: p.id, child: Text(p.title)),
+        if (c.customLayout != null)
+          const DropdownMenuItem(value: 'custom',
+              child: Text('Bố cục tùy chỉnh đã lưu')),
+      ],
+      onChanged: (id) {
+        if (id == null) return;
+        setState(() { draftLayout = null; layoutError = ''; });
+        if (id == 'custom') {
+          unawaited(widget.store.update(c.copyWith(useCustomLayout: true)));
+        } else {
+          unawaited(widget.store.update(c.copyWith(
+              layoutPresetId: id, useCustomLayout: false)));
+        }
+      },
+    ),
+    _section('Chỉnh sửa lưới 12×12'),
+    const Text('Kéo ô để di chuyển; kéo chấm vàng ở góc dưới phải '
+        'để thay đổi kích thước. Thanh biểu tượng cố định. '
+        'Ô chồng lấn hoặc vượt lưới sẽ bị từ chối.'),
+    const SizedBox(height: 8),
+    Grid12Editor(
+      key: ValueKey(c.layoutPresetId + (c.useCustomLayout ? 'custom' : 'preset')),
+      layout: draftLayout ?? c.activeLayout,
+      ratio: c.targetWidthPx / c.targetHeightPx,
+      onEdited: (next) => setState(() {
+        draftLayout = next; layoutError = '';
+      }),
+      onRejected: (error) => setState(() => layoutError = error),
+    ),
+    if (layoutError.isNotEmpty)
+      Text(layoutError, style: const TextStyle(color: Colors.orange)),
+    const SizedBox(height: 8),
+    Wrap(spacing: 8, runSpacing: 8, children: [
+      FilledButton.icon(
+        key: const Key('save-grid12-layout'),
+        onPressed: draftLayout == null ? null : () {
+          final next = draftLayout!;
+          setState(() { draftLayout = null; layoutError = ''; });
+          unawaited(widget.store.update(c.copyWith(
+              customLayout: next, useCustomLayout: true)));
+        },
+        icon: const Icon(Icons.save_outlined),
+        label: const Text('Lưu bố cục tùy chỉnh'),
+      ),
+      OutlinedButton.icon(
+        onPressed: draftLayout == null ? null : () =>
+            setState(() { draftLayout = null; layoutError = ''; }),
+        icon: const Icon(Icons.undo),
+        label: const Text('Hủy thay đổi'),
+      ),
+      OutlinedButton.icon(
+        onPressed: () {
+          setState(() { draftLayout = null; layoutError = ''; });
+          unawaited(widget.store.update(c.copyWith(
+              layoutPresetId: 'vf_e34', useCustomLayout: false)));
+        },
+        icon: const Icon(Icons.restore),
+        label: const Text('Về mẫu VF e34'),
+      ),
+    ]),
     _section('Kích thước màn hình mô phỏng'),
     DropdownButton<(int, int)>(
       isExpanded: true,
@@ -387,39 +464,19 @@ class _SettingsHomeState extends State<SettingsHome> {
           (c.targetWidthPx, c.targetHeightPx),
         })
           DropdownMenuItem(value: profile,
-              child: Text('${profile.$1} × ${profile.$2} px')),
+              child: Text(profile.$1.toString() + ' × ' +
+                  profile.$2.toString() + ' px')),
       ],
       onChanged: (value) {
         if (value != null) {
           unawaited(widget.store.update(c.copyWith(
-            targetWidthPx: value.$1, targetHeightPx: value.$2)));
+              targetWidthPx: value.$1, targetHeightPx: value.$2)));
         }
       },
     ),
-    _configSlider('Cột bản đồ', c.columnRatio, 0.50, 0.70,
-        (value) => c.copyWith(columnRatio: value)),
-    _configSlider('Hàng lịch', c.calendarWeight, 0.10, 0.75,
-        (value) => c.copyWith(calendarWeight: value)),
-    _configSlider('Hàng VietQR', c.qrWeight, 0.10, 0.75,
-        (value) => c.copyWith(qrWeight: value)),
-    _configSlider('Hàng Media', c.mediaWeight, 0.10, 0.75,
-        (value) => c.copyWith(mediaWeight: value)),
-    const Text('Trọng số ba hàng được tự chuẩn hóa về 100%.'),
+    const Text('M4.4A: Bố cục đã lưu chỉ áp dụng cho bản preview. '
+        'Android Auto thực tế tiếp tục hiển thị bản đồ mặc định.'),
   ]);
-
-  Widget _configSlider(String label, double value, double min, double max,
-      CarLayoutConfig Function(double) build) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text('$label: ${(value * 100).toStringAsFixed(0)}'),
-      Slider(
-        value: value.clamp(min, max).toDouble(), min: min, max: max,
-        divisions: 20,
-        label: (value * 100).round().toString(),
-        onChanged: (next) => unawaited(widget.store.update(build(next))),
-      ),
-    ],
-  );
 
   Widget _mapPage(CarLayoutConfig c) => _scroll([
     _section('Bản đồ và cảnh báo giao thông'),
