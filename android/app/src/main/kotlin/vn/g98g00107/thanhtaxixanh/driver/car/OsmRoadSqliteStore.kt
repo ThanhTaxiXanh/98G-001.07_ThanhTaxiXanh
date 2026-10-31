@@ -459,6 +459,23 @@ object OsmRoadSqliteStore {
         }
     }
 
+    /** M5.3X: inspect source labels of all topology-linked segments.
+     * Distinct labels or empty topology mean snapshot compatibility is unknown.
+     */
+    @Synchronized
+    fun topologySources(context: Context): Set<String> {
+        val db = database(context)
+        try {
+            val sources = LinkedHashSet<String>()
+            db.rawQuery("SELECT DISTINCT source FROM road_topology", null).use { cursor ->
+                while (cursor.moveToNext()) sources.add(cursor.getString(0))
+            }
+            return sources
+        } finally {
+            db.close()
+        }
+    }
+
     /** M5.3G: read ONLY explicitly linked topology rows; never infer node IDs.
      * This is a bounded offline review API, not a verified speed source.
      */
