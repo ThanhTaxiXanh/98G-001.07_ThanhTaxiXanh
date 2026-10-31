@@ -353,6 +353,79 @@ object OsmRoadSqliteStore {
     }
 
     /**
+     * M5.3E: attach explicit topology to one EXACT existing road geometry.
+     * This is not an automatic import: caller must provide a trusted segment
+     * and provenance. Ambiguous or duplicate geometry fails closed.
+     * All links are committed or rolled back as one transaction.
+     */
+    @Synchronized
+    fun attachTopology(context: Context,
+                       entries: List<Pair<OsmRoadSegment, OsmTopologyParser.Link>>): Int {
+        require(entries.isNotEmpty() && entries.size <= 50_000)
+        val db = database(context)
+        try {
+            db.beginTransaction()
+            try {
+                val seen = HashSet<Long>()
+                val stmt = db.compileStatement("""
+                    INSERT INTO road_topology
+                    (road_id,osm_way_id,from_osm_node,to_osm_node,layer,bridge,tunnel,source)
+                    VALUES (?,?,?,?,?,?,?,?)
+                """.trimIndent())
+                try {
+                    for ((road, link) in entries) {
+                        require(link.wayId.matches(Regex("[1-9][0-9]{0,18}")) &&
+                            link.fromNode.matches(Regex("[1-9][0-9]{0,18}")) &&
+                            link.toNode.matches(Regex("[1-9][0-9]{0,18}")) &&
+                            link.fromNode != link.toNode &&
+                            link.source.isNotBlank() && link.source.length <= 256)
+                        val ids = ArrayList<Long>()
+                        db.rawQuery("""
+                            SELECT id FROM roads
+                            WHERE lat1=? AND lon1=? AND lat2=? AND lon2=?
+                              AND ((base_kmh IS NULL AND ? IS NULL) OR base_kmh=?)
+                              AND ((forward_kmh IS NULL AND ? IS NULL) OR forward_kmh=?)
+                              AND ((backward_kmh IS NULL AND ? IS NULL) OR backward_kmh=?)
+                              AND oneway=? AND name=?
+                            LIMIT 2
+                        """.trimIndent(), arrayOf(
+                            road.lat1.toString(), road.lon1.toString(),
+                            road.lat2.toString(), road.lon2.toString(),
+                            road.generalKmh?.toString(), road.generalKmh?.toString(),
+                            road.forwardKmh?.toString(), road.forwardKmh?.toString(),
+                            road.backwardKmh?.toString(), road.backwardKmh?.toString(),
+                            road.oneway.toString(), road.name
+                        )).use { cursor ->
+                            while (cursor.moveToNext()) ids.add(cursor.getLong(0))
+                        }
+                        require(ids.size == 1) { "Topology geometry not unique or missing" }
+                        val id = ids.single()
+                        require(seen.add(id)) { "Duplicate road topology mapping" }
+                        stmt.clearBindings()
+                        stmt.bindLong(1, id)
+                        stmt.bindString(2, link.wayId)
+                        stmt.bindString(3, link.fromNode)
+                        stmt.bindString(4, link.toNode)
+                        if (link.layer != null) stmt.bindLong(5, link.layer.toLong())
+                        stmt.bindLong(6, if (link.bridge) 1 else 0)
+                        stmt.bindLong(7, if (link.tunnel) 1 else 0)
+                        stmt.bindString(8, link.source)
+                        check(stmt.executeInsert() > 0) { "Topology already linked" }
+                    }
+                } finally {
+                    stmt.close()
+                }
+                db.setTransactionSuccessful()
+                return seen.size
+            } finally {
+                db.endTransaction()
+            }
+        } finally {
+            db.close()
+        }
+    }
+
+    /**
      * RTree prefilter for a 30m vicinity. If >128 segments intersect the box,
      * return no candidates instead of silently truncating ambiguous roads.
      */
