@@ -197,6 +197,50 @@ class _SettingsHomeState extends State<SettingsHome> {
     }
   }
 
+  Future<void> _importRoadTopologyGeoJson() async {
+    if (roadBusy) return;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Nhập OSM có định danh nút đường?'),
+        content: const Text(
+          'Chế độ này thay toàn bộ dữ liệu đường hiện tại. Tệp GeoJSON '
+          'phải có osm_way_id và osm_node_ids theo thứ tự tọa độ, '
+          'cùng maxspeed hợp lệ. Nếu nhập lỗi, dữ liệu cũ được giữ lại. '
+          'Dữ liệu mới chỉ dùng để rà soát, không xác nhận giới hạn tốc độ.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false),
+              child: const Text('Hủy')),
+          FilledButton(onPressed: () => Navigator.pop(context, true),
+              child: const Text('Chọn tệp')),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    setState(() {
+      roadBusy = true;
+      roadError = '';
+    });
+    try {
+      final status = await locationChannel.invokeMapMethod<String, dynamic>(
+        'importRoadTopologyGeoJson');
+      if (mounted && status != null) {
+        setState(() {
+          roadStatus = Map<String, dynamic>.from(status);
+          roadQuality = null;
+        });
+      }
+    } on MissingPluginException {
+      if (mounted) setState(() =>
+          roadError = 'Chỉ hỗ trợ nhập topology trên Android.');
+    } on PlatformException catch (e) {
+      if (mounted) setState(() =>
+          roadError = e.message ?? 'Tệp topology không hợp lệ');
+    } finally {
+      if (mounted) setState(() => roadBusy = false);
+    }
+  }
+
   Future<void> _scanRoadQuality() async {
     if (roadBusy) return;
     setState(() {
@@ -552,6 +596,11 @@ class _SettingsHomeState extends State<SettingsHome> {
       onPressed: roadBusy ? null : () => unawaited(_importRoadGeoJson()),
       icon: const Icon(Icons.file_open),
       label: Text(roadBusy ? 'Đang nhập dữ liệu…' : 'Thay toàn bộ bằng tệp GeoJSON'),
+    ),
+    OutlinedButton.icon(
+      onPressed: roadBusy ? null : () => unawaited(_importRoadTopologyGeoJson()),
+      icon: const Icon(Icons.account_tree_outlined),
+      label: const Text('Nhập GeoJSON có OSM Node ID (thay toàn bộ)'),
     ),
     if (roadStatus['available'] == true)
       OutlinedButton.icon(
