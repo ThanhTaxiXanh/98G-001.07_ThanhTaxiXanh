@@ -264,8 +264,8 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
             // AA host controls the safe drawing rectangle. Render only inside
             // that rectangle; never draw custom tiles under host controls.
             val dashboard = safeViewport.overlaySafe &&
-                safeViewport.bounds.width() >= 460 &&
-                safeViewport.bounds.height() >= 230
+                safeViewport.bounds.width() >= 280 &&
+                safeViewport.bounds.height() >= 150
             val mapArea = if (dashboard) {
                 val bounds = safeViewport.bounds
                 Rect(bounds.left, bounds.top,
@@ -274,7 +274,15 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
             lastMap?.takeIf { !it.isRecycled }?.let {
                 canvas.drawBitmap(it, null, mapArea, Paint(Paint.FILTER_BITMAP_FLAG))
             }
-            if (dashboard) drawDashboardTiles(canvas, safeViewport.bounds)
+            if (dashboard) {
+                drawDashboardTiles(canvas, safeViewport.bounds)
+                Log.d(tag, "AA dashboard rendered in safe viewport " +
+                    safeViewport.bounds.toShortString())
+            } else {
+                Log.d(tag, "AA dashboard hidden: safe=" + safeViewport.overlaySafe +
+                    " viewport=" + safeViewport.bounds.toShortString() +
+                    " warning=" + safeViewport.warning)
+            }
             // Always render the map to the host Surface. If the host has not
             // provided reliable insets, do NOT put speed/HUD above host chrome.
             if (!safeViewport.overlaySafe || safeViewport.bounds.width() < 180 ||
