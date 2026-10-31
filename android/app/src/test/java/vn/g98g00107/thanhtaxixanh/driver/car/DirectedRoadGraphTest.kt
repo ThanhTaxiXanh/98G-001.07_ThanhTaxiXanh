@@ -44,6 +44,20 @@ class DirectedRoadGraphTest {
                 emptySet(), "a", "a").reason)
     }
 
+    @Test fun choosesShortestRouteInsteadOfFirstDiscoveredTarget() {
+        val start = DirectedRoadGraph.Edge("start", "S", "J", 1.0, "1")
+        val expensive = DirectedRoadGraph.Edge("expensive", "J", "X", 1.0, "2")
+        val expensiveEnd = DirectedRoadGraph.Edge("expensiveEnd", "X", "T", 100.0, "3")
+        val cheap = DirectedRoadGraph.Edge("cheap", "J", "Y", 3.0, "4")
+        val cheapEnd = DirectedRoadGraph.Edge("cheapEnd", "Y", "T", 1.0, "5")
+        val target = DirectedRoadGraph.Edge("target", "T", "Z", 1.0, "6")
+        val result = DirectedRoadGraph.transition(
+            listOf(start, expensive, expensiveEnd, cheap, cheapEnd, target),
+            emptySet(), "start", "target")
+        assertTrue(result.allowed)
+        assertEquals(6.0, result.distanceM!!, 0.001)
+    }
+
     @Test fun forbiddenEdgeIsRejected() {
         assertFalse(DirectedRoadGraph.transition(listOf(a, b.copy(permitted = false)),
             emptySet(), "a", "b").allowed)
