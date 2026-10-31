@@ -3,7 +3,12 @@ package vn.g98g00107.thanhtaxixanh.driver.car
 import android.graphics.Rect
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [28])
 class CarSurfaceViewportTest {
     @Test fun intersectVisibleAndStableToKeepHudOutOfChrome() {
         val safe = CarSurfaceViewport.compute(1000, 600,
