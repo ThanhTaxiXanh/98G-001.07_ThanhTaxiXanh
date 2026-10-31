@@ -13,6 +13,9 @@ object GpxDirectedRoadReview {
                       val ambiguous: Int, val disconnected: Int,
                       val invalidHeading: Int = 0, val implausibleTime: Int = 0,
                       val prohibitedTurn: Int = 0,
+                      val restrictionRelations: Int = 0,
+                      val resolvedRestrictionRelations: Int = 0,
+                      val unresolvedRestrictionRelations: Int = 0,
                       val status: String = "UNVERIFIED_REVIEW_ONLY")
 
     data class Road(val id: Long, val lat1: Double, val lon1: Double,
@@ -133,11 +136,18 @@ object GpxDirectedRoadReview {
 
     fun inspectOffline(context: Context, fixes: List<GpsTraceRoadReview.Fix>): Report {
         val graph = OsmRoadSqliteStore.topologyGraph(context)
-        return inspect(fixes, graph) { fix ->
+        val relations = OsmRestrictionSqliteStore.read(context)
+        val resolution = OsmTurnRestrictionResolver.resolve(relations, graph.edges)
+        val review = inspect(fixes, graph, resolution.restrictions) { fix ->
             OsmRoadSqliteStore.nearbyIdentified(context,fix.lat,fix.lon)?.map {
                 Road(it.roadId,it.segment.lat1,it.segment.lon1,
                     it.segment.lat2,it.segment.lon2)
             }
         }
+        return review.copy(
+            restrictionRelations = relations.size,
+            resolvedRestrictionRelations = resolution.resolvedRelations,
+            unresolvedRestrictionRelations = resolution.unresolvedRelations
+        )
     }
 }
