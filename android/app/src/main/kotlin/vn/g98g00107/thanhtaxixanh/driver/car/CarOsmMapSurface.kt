@@ -301,8 +301,26 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
                 CarGrid12Layout.bounds(currentTiles.first { it.name == "map" },
                     safeViewport.bounds)
             } else Rect(0, 0, width, height)
-            lastMap?.takeIf { !it.isRecycled }?.let {
-                canvas.drawBitmap(it, null, mapArea, Paint(Paint.FILTER_BITMAP_FLAG))
+            lastMap?.takeIf { !it.isRecycled }?.let { bitmap ->
+                // Center-crop to preserve map scale and aspect ratio when
+                // the driver changes the map tile's rows/columns.
+                val targetAspect = mapArea.width().toFloat() /
+                    mapArea.height().coerceAtLeast(1)
+                val sourceAspect = bitmap.width.toFloat() /
+                    bitmap.height.coerceAtLeast(1)
+                val src = if (sourceAspect > targetAspect) {
+                    val cropWidth = (bitmap.height * targetAspect).toInt()
+                        .coerceIn(1, bitmap.width)
+                    val left = (bitmap.width - cropWidth) / 2
+                    Rect(left, 0, left + cropWidth, bitmap.height)
+                } else {
+                    val cropHeight = (bitmap.width / targetAspect).toInt()
+                        .coerceIn(1, bitmap.height)
+                    val top = (bitmap.height - cropHeight) / 2
+                    Rect(0, top, bitmap.width, top + cropHeight)
+                }
+                canvas.drawBitmap(bitmap, src, mapArea,
+                    Paint(Paint.FILTER_BITMAP_FLAG))
             }
             if (dashboard) drawGrid12Tiles(canvas, safeViewport.bounds)
             val dashboardDiagnostic = if (dashboard) "visible" else when {
