@@ -32,3 +32,8 @@ Mọi giới hạn và tiến độ trong [docs/FEATURE_MATRIX.md](docs/FEATURE_
 ## M4.3 — Kiểm tra dữ liệu offline
 
 Trang Bản đồ trên điện thoại có nút **Rà soát dữ liệu SQLite** (chỉ đọc) và nút **Dọn bản sao cũ** có xác nhận người dùng; cleanup dùng transaction, có kiểm tra fingerprint trước khi xóa và tuyệt đối không bỏ các bản ghi maxspeed mâu thuẫn. Chi tiết tại [hướng dẫn GeoJSON và rà soát](docs/OSM_GEOJSON_PHONE_GUIDE.md). CI M4.3 phải hoàn thành trước khi coi APK bản này sẵn sàng thử.
+
+
+## M5.1 — Điểm biển báo/camera GeoJSON ngoại tuyến
+
+Trên điện thoại: tab **Bản đồ → M5.1 Kho biển báo/camera** để nhập bổ sung hoặc thay thế tệp Point GeoJSON có `kind`, `source`, `license`. SQLite lưu tối đa 100.000 điểm ứng viên, tất cả `UNVERIFIED`. Không thay đổi dữ liệu maxspeed đoạn đường M4 và chưa phát cảnh báo trên Android Auto. Công cụ chuyển dữ liệu Overpass Turbo theo tag rõ ràng: [tools/overpass_traffic_converter.html](tools/overpass_traffic_converter.html). Hướng dẫn đầy đủ: [docs/M5_1_TRAFFIC_POINT_IMPORT.md](docs/M5_1_TRAFFIC_POINT_IMPORT.md).
