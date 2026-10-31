@@ -17,6 +17,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ExecutorService
 import android.util.Log
 import android.view.Surface
+import kotlin.math.ln
 import androidx.car.app.SurfaceCallback
 import androidx.car.app.SurfaceContainer
 import org.maplibre.android.MapLibre
@@ -102,6 +103,11 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
     }
 
     override fun onSurfaceAvailable(container: SurfaceContainer) {
+        // The host may re-provide a Surface when size/DPI changes.
+        // Release only a *different* previous instance; reuse is legitimate.
+        if (targetSurface !== container.surface) targetSurface?.release()
+        stable = null
+        visible = null
         generation++
         snapshotter?.cancel()
         snapshotter = null
@@ -117,6 +123,8 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
         targetSurface = container.surface
         width = container.width
         height = container.height
+        CarSurfaceTelemetry.record(context, "surfaceAvailable", width, height,
+            visible, stable)
         Log.i(tag, "OSM surface " + width + "x" + height)
         if (width < 32 || height < 32 || targetSurface?.isValid != true) return
         drawFrame()
@@ -213,6 +221,8 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
                     rendering = false
                     error = null
                     lastMap = result.bitmap
+                    CarSurfaceTelemetry.record(context, "snapshotReady", width,
+                        height, visible, stable)
                     drawFrame()
                     if (dirty) {
                         dirty = false
@@ -223,6 +233,8 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
                 if (currentGeneration == generation) {
                     rendering = false
                     error = "Không tải được lớp bản đồ OSM"
+                    CarSurfaceTelemetry.record(context, "snapshotFailed", width,
+                        height, visible, stable)
                     Log.w(tag, "Map snapshot failed: " + failure)
                     drawFrame()
                 }
@@ -235,14 +247,8 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
         }
     }
 
-    private fun safeArea(): Rect {
-        val rect = Rect(stable ?: visible ?: Rect(0, 0, width, height))
-        if (!rect.intersect(0, 0, width, height) ||
-            rect.width() < 130 || rect.height() < 100) {
-            return Rect(0, 0, width, height)
-        }
-        return rect
-    }
+    private fun safeViewport(): CarSafeViewport =
+        CarSurfaceViewport.compute(width, height, visible, stable)
 
     private fun drawFrame() {
         val surface = targetSurface ?: return
@@ -255,7 +261,12 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
                 canvas.drawBitmap(it, null, Rect(0, 0, width, height),
                     Paint(Paint.FILTER_BITMAP_FLAG))
             }
-            val area = safeArea()
+            val safeViewport = safeViewport()
+            // Always render the map to the host Surface. If the host has not
+            // provided reliable insets, do NOT put speed/HUD above host chrome.
+            if (!safeViewport.overlaySafe || safeViewport.bounds.width() < 180 ||
+                safeViewport.bounds.height() < 140) return
+            val area = safeViewport.bounds
             val scale = (minOf(width, height) / 680f).coerceIn(0.60f, 1.35f)
             val label = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.WHITE
@@ -303,23 +314,65 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
             Log.w(tag, "Unable to draw host surface", e)
         } finally {
             if (canvas != null) {
-                try { surface.unlockCanvasAndPost(canvas) }
-                catch (e: Exception) { Log.w(tag, "Unable to post host surface", e) }
+                try {
+                    surface.unlockCanvasAndPost(canvas)
+                    CarSurfaceTelemetry.framePosted(context)
+                } catch (e: Exception) {
+                    Log.w(tag, "Unable to post host surface", e)
+                }
             }
         }
     }
 
     override fun onVisibleAreaChanged(visibleArea: Rect) {
         visible = Rect(visibleArea)
+        CarSurfaceTelemetry.record(context, "visibleAreaChanged", width, height,
+            visible, stable)
         drawFrame()
     }
 
     override fun onStableAreaChanged(stableArea: Rect) {
         stable = Rect(stableArea)
+        CarSurfaceTelemetry.record(context, "stableAreaChanged", width, height,
+            visible, stable)
         drawFrame()
     }
 
-    override fun onSurfaceDestroyed(container: SurfaceContainer) { stop() }
+    override fun onScroll(distanceX: Float, distanceY: Float) {
+        // A host may not forward gestures (e.g. when pan mode is unavailable).
+        // Report observed events; map panning remains disabled until host test.
+        CarSurfaceTelemetry.record(context, "scroll", width, height,
+            visible, stable)
+    }
+
+    override fun onScale(focusX: Float, focusY: Float, scaleFactor: Float) {
+        CarSurfaceTelemetry.record(context, "scale", width, height,
+            visible, stable)
+        if (scaleFactor.isFinite() && scaleFactor in 0.5f..2.0f) {
+            zoomBy(ln(scaleFactor.toDouble()) / ln(2.0))
+        }
+    }
+
+    override fun onFling(velocityX: Float, velocityY: Float) {
+        CarSurfaceTelemetry.record(context, "fling", width, height,
+            visible, stable)
+    }
+
+    override fun onClick(x: Float, y: Float) {
+        CarSurfaceTelemetry.record(context, "click", width, height,
+            visible, stable)
+    }
+
+    override fun onSurfaceDestroyed(container: SurfaceContainer) {
+        // Do not stop a newer Surface if host destroys a previous instance.
+        if (targetSurface !== container.surface) {
+            container.surface?.release()
+            return
+        }
+        CarSurfaceTelemetry.record(context, "surfaceDestroyed", width, height,
+            visible, stable)
+        stop()
+    }
 
     fun stop() {
         generation++
@@ -331,6 +384,7 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
         catch (_: Exception) {}
         snapshotter?.cancel()
         snapshotter = null
+        targetSurface?.release()
         targetSurface = null
         lastMap = null
         rendering = false
