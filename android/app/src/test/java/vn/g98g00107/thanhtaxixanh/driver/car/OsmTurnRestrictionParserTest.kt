@@ -2,7 +2,12 @@ package vn.g98g00107.thanhtaxixanh.driver.car
 
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [28])
 class OsmTurnRestrictionParserTest {
     private fun json(kind: String) = """{"type":"FeatureCollection","features":[
       {"type":"Feature","properties":{"type":"restriction","osm_relation_id":"9001",
