@@ -383,17 +383,17 @@ object OsmRoadSqliteStore {
                         db.rawQuery("""
                             SELECT id FROM roads
                             WHERE lat1=? AND lon1=? AND lat2=? AND lon2=?
-                              AND ((base_kmh IS NULL AND ? IS NULL) OR base_kmh=?)
-                              AND ((forward_kmh IS NULL AND ? IS NULL) OR forward_kmh=?)
-                              AND ((backward_kmh IS NULL AND ? IS NULL) OR backward_kmh=?)
+                              AND COALESCE(base_kmh,-1)=?
+                              AND COALESCE(forward_kmh,-1)=?
+                              AND COALESCE(backward_kmh,-1)=?
                               AND oneway=? AND name=?
                             LIMIT 2
                         """.trimIndent(), arrayOf(
                             road.lat1.toString(), road.lon1.toString(),
                             road.lat2.toString(), road.lon2.toString(),
-                            road.generalKmh?.toString(), road.generalKmh?.toString(),
-                            road.forwardKmh?.toString(), road.forwardKmh?.toString(),
-                            road.backwardKmh?.toString(), road.backwardKmh?.toString(),
+                            (road.generalKmh ?: -1).toString(),
+                            (road.forwardKmh ?: -1).toString(),
+                            (road.backwardKmh ?: -1).toString(),
                             road.oneway.toString(), road.name
                         )).use { cursor ->
                             while (cursor.moveToNext()) ids.add(cursor.getLong(0))
