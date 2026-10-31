@@ -550,6 +550,57 @@ object OsmRoadSqliteStore {
     }
 
 
+    /** M5.3Q: stable SQLite road IDs for topology-linked segments only.
+     * Never use query ordering as road identity or silently truncate overflow.
+     */
+    data class IdentifiedRoad(val roadId: Long, val segment: OsmRoadSegment)
+
+    @Synchronized
+    fun nearbyIdentified(context: Context, latitude: Double, longitude: Double):
+        List<IdentifiedRoad>? {
+        if (!latitude.isFinite() || !longitude.isFinite() ||
+            latitude !in -90.0..90.0 || longitude !in -180.0..180.0) return null
+        val scale = abs(cos(latitude * PI / 180.0))
+        if (scale < 0.01) return null
+        val latDelta = 32.0 / 111195.0
+        val lonDelta = 32.0 / (111195.0 * scale)
+        val db = database(context)
+        try {
+            val results = ArrayList<IdentifiedRoad>()
+            db.rawQuery("""
+                SELECT r.id, r.lat1, r.lon1, r.lat2, r.lon2,
+                       r.base_kmh, r.forward_kmh, r.backward_kmh, r.oneway, r.name
+                FROM road_rtree AS i
+                JOIN roads AS r ON r.id = i.id
+                JOIN road_topology AS t ON t.road_id = r.id
+                WHERE i.min_lat <= ? AND i.max_lat >= ?
+                  AND i.min_lon <= ? AND i.max_lon >= ?
+                ORDER BY r.id LIMIT ?
+            """.trimIndent(), arrayOf(
+                (latitude + latDelta).toString(),
+                (latitude - latDelta).toString(),
+                (longitude + lonDelta).toString(),
+                (longitude - lonDelta).toString(),
+                (MAX_MATCH_CANDIDATES + 1).toString()
+            )).use { cursor ->
+                while (cursor.moveToNext()) {
+                    if (results.size >= MAX_MATCH_CANDIDATES) return null
+                    results.add(IdentifiedRoad(cursor.getLong(0), OsmRoadSegment(
+                        cursor.getDouble(1), cursor.getDouble(2),
+                        cursor.getDouble(3), cursor.getDouble(4),
+                        if (cursor.isNull(5)) null else cursor.getInt(5),
+                        if (cursor.isNull(6)) null else cursor.getInt(6),
+                        if (cursor.isNull(7)) null else cursor.getInt(7),
+                        cursor.getInt(8), cursor.getString(9) ?: ""
+                    )))
+                }
+            }
+            return results
+        } finally {
+            db.close()
+        }
+    }
+
     data class QualityReport(
         val segments: Int,
         val fingerprintRows: Int,
