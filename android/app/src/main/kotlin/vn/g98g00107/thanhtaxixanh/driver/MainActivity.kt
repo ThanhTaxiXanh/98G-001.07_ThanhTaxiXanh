@@ -38,6 +38,20 @@ class MainActivity : FlutterActivity() {
                     sendBroadcast(Intent(ACTION_CONFIG_CHANGED).setPackage(packageName))
                     result.success(null)
                 }
+                "getCarSurfaceDiagnostics" -> {
+                    result.success(
+                        vn.g98g00107.thanhtaxixanh.driver.car.CarSurfaceTelemetry
+                            .snapshot(applicationContext)
+                    )
+                }
+                "clearCarSurfaceDiagnostics" -> {
+                    vn.g98g00107.thanhtaxixanh.driver.car.CarSurfaceTelemetry
+                        .clear(applicationContext)
+                    result.success(
+                        vn.g98g00107.thanhtaxixanh.driver.car.CarSurfaceTelemetry
+                            .snapshot(applicationContext)
+                    )
+                }
                 "getLocationPermission" -> result.success(locationGranted())
                 "phoneMapPreviewCommand" -> {
                     try {
