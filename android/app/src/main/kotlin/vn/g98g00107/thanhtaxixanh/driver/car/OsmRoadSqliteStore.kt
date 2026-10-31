@@ -8,6 +8,7 @@ import android.database.sqlite.SQLiteOpenHelper
 import android.net.Uri
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.security.MessageDigest
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -23,6 +24,7 @@ object OsmRoadSqliteStore {
     private const val DATABASE = "osm_roads_m4.sqlite"
     private const val SCHEMA = 1
     private const val MAX_MATCH_CANDIDATES = 128
+    const val MAX_TOTAL_SEGMENTS = 1_000_000
 
     data class Summary(val segments: Int, val features: Int, val importedAt: Long)
 
@@ -94,7 +96,8 @@ object OsmRoadSqliteStore {
                 "features" to (meta(db, "features")?.toIntOrNull() ?: 0),
                 "updatedAt" to (meta(db, "updatedAt")?.toLongOrNull() ?: 0L),
                 "source" to "User-imported OSM maxspeed (unverified)",
-                "storage" to ("SQLite " + (meta(db, "indexType") ?: "Unknown"))
+                "storage" to ("SQLite " + (meta(db, "indexType") ?: "Unknown")),
+                "maximumSegments" to MAX_TOTAL_SEGMENTS
             )
         } finally {
             db.close()
@@ -102,7 +105,7 @@ object OsmRoadSqliteStore {
     }
 
     @Synchronized
-    fun importGeoJson(context: Context, uri: Uri): Summary {
+    fun importGeoJson(context: Context, uri: Uri, append: Boolean = false): Summary {
         val bytes = context.contentResolver.openInputStream(uri)?.use { stream ->
             val buffer = ByteArray(16_384)
             val out = ByteArrayOutputStream()
@@ -118,7 +121,10 @@ object OsmRoadSqliteStore {
         } ?: throw IllegalArgumentException("Không đọc được tệp GeoJSON")
         val parsed = OsmRoadCatalog.parse(bytes.toString(Charsets.UTF_8))
         require(parsed.roads.isNotEmpty()) { "Không có đoạn đường maxspeed phù hợp" }
-        val summary = replace(context, parsed.roads, parsed.featureCount)
+        val hash = MessageDigest.getInstance("SHA-256").digest(bytes)
+            .joinToString("") { "%02x".format(it) }
+        val summary = replace(context, parsed.roads, parsed.featureCount,
+            append = append, sourceFingerprint = hash)
         // The old M3 file should not overwrite a successfully installed M4 dataset.
         File(context.filesDir, "osm_maxspeed_v1.geojson").delete()
         context.getSharedPreferences("osm_speed_import_v1", Context.MODE_PRIVATE)
@@ -153,17 +159,33 @@ object OsmRoadSqliteStore {
 
     @Synchronized
     fun replace(context: Context, roads: List<OsmRoadSegment>,
-                featureCount: Int): Summary {
+                featureCount: Int, append: Boolean = false,
+                sourceFingerprint: String? = null): Summary {
         require(roads.isNotEmpty() && roads.size <= OsmRoadCatalog.MAX_SEGMENTS) {
             "Số lượng đoạn đường ngoài giới hạn M4"
         }
         val db = database(context)
         val now = System.currentTimeMillis()
+        var finalCount = 0
+        var finalFeatures = 0
         try {
+            val hashKey = sourceFingerprint?.let { "importSha:$it" }
+            val oldCount = count(db)
+            val oldFeatures = if (append) meta(db, "features")?.toIntOrNull() ?: 0 else 0
+            if (append && hashKey != null && meta(db, hashKey) != null) {
+                return Summary(oldCount, oldFeatures,
+                    meta(db, "updatedAt")?.toLongOrNull() ?: 0L)
+            }
+            require(!append || oldCount.toLong() + roads.size <= MAX_TOTAL_SEGMENTS) {
+                "Vượt hạn mức 1.000.000 đoạn đường"
+            }
             db.beginTransaction()
             try {
-                db.execSQL("DELETE FROM road_rtree")
-                db.execSQL("DELETE FROM roads")
+                if (!append) {
+                    db.execSQL("DELETE FROM road_rtree")
+                    db.execSQL("DELETE FROM roads")
+                    db.execSQL("DELETE FROM metadata WHERE key != 'indexType'")
+                }
                 val insertRoad = db.compileStatement("""
                     INSERT INTO roads
                     (lat1,lon1,lat2,lon2,base_kmh,forward_kmh,backward_kmh,oneway,name)
@@ -200,10 +222,16 @@ object OsmRoadSqliteStore {
                     insertRoad.close()
                     insertIndex.close()
                 }
+                finalCount = (if (append) oldCount else 0) + roads.size
+                finalFeatures = oldFeatures + featureCount
                 db.execSQL("INSERT OR REPLACE INTO metadata(key,value) VALUES('features',?)",
-                    arrayOf(featureCount.toString()))
+                    arrayOf(finalFeatures.toString()))
                 db.execSQL("INSERT OR REPLACE INTO metadata(key,value) VALUES('updatedAt',?)",
                     arrayOf(now.toString()))
+                hashKey?.let { key ->
+                    db.execSQL("INSERT OR REPLACE INTO metadata(key,value) VALUES(?,?)",
+                        arrayOf(key, now.toString()))
+                }
                 db.setTransactionSuccessful()
             } finally {
                 db.endTransaction()
@@ -211,7 +239,7 @@ object OsmRoadSqliteStore {
         } finally {
             db.close()
         }
-        return Summary(roads.size, featureCount, now)
+        return Summary(finalCount, finalFeatures, now)
     }
 
     /**
@@ -273,7 +301,7 @@ object OsmRoadSqliteStore {
             try {
                 db.execSQL("DELETE FROM road_rtree")
                 db.execSQL("DELETE FROM roads")
-                db.execSQL("DELETE FROM metadata")
+                db.execSQL("DELETE FROM metadata WHERE key != 'indexType'")
                 db.setTransactionSuccessful()
             } finally {
                 db.endTransaction()
