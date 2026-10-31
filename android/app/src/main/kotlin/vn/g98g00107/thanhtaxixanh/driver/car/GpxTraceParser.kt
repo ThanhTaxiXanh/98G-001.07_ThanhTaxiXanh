@@ -33,8 +33,8 @@ object GpxTraceParser {
         factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true)
         factory.isXIncludeAware = false
         factory.setExpandEntityReferences(false)
-        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "")
-        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "")
+        factory.setAttribute("http://javax.xml.XMLConstants/property/accessExternalDTD", "")
+        factory.setAttribute("http://javax.xml.XMLConstants/property/accessExternalSchema", "")
         val document = factory.newDocumentBuilder().parse(InputSource(StringReader(xml)))
         val root = document.documentElement
         require(root.localName == "gpx") { "Not a GPX document" }
