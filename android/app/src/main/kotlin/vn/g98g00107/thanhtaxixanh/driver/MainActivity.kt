@@ -16,6 +16,7 @@ class MainActivity : FlutterActivity() {
     private var pendingRoadAppend = false
     private var pendingTopologyImport = false
     private var pendingGpxImport: MethodChannel.Result? = null
+    private var pendingRestrictionImport: MethodChannel.Result? = null
     private var pendingTrafficImport: MethodChannel.Result? = null
     private var pendingTrafficAppend = true
     private var phoneMapPreviewFactory: PhoneMapPreviewFactory? = null
@@ -172,6 +173,42 @@ class MainActivity : FlutterActivity() {
                         }
                     }
                 }
+                "importOsmTurnRestrictions" -> {
+                    if (pendingRestrictionImport != null) {
+                        result.error("ALREADY_IMPORTING", "Đang chọn tệp cấm rẽ", null)
+                    } else {
+                        pendingRestrictionImport = result
+                        try {
+                            val picker = Intent(Intent.ACTION_OPEN_DOCUMENT)
+                                .addCategory(Intent.CATEGORY_OPENABLE)
+                                .setType("*/*")
+                                .putExtra(Intent.EXTRA_MIME_TYPES, arrayOf(
+                                    "application/json", "application/geo+json",
+                                    "text/plain", "application/octet-stream"
+                                ))
+                            startActivityForResult(picker, RESTRICTION_IMPORT_REQUEST)
+                        } catch (e: Exception) {
+                            pendingRestrictionImport = null
+                            result.error("PICKER_UNAVAILABLE", e.message, null)
+                        }
+                    }
+                }
+                "getOsmTurnRestrictionStatus" -> {
+                    thread(name = "RestrictionStatus") {
+                        try {
+                            val rows = vn.g98g00107.thanhtaxixanh.driver.car
+                                .OsmRestrictionSqliteStore.read(applicationContext)
+                            runOnUiThread {
+                                result.success(mapOf(
+                                    "relations" to rows.size,
+                                    "status" to "UNVERIFIED_REVIEW_ONLY"
+                                ))
+                            }
+                        } catch (e: Exception) {
+                            runOnUiThread { result.error("RESTRICTION_STATUS", e.message, null) }
+                        }
+                    }
+                }
                 "reviewGpxTrack" -> {
                     if (pendingGpxImport != null) {
                         result.error("ALREADY_IMPORTING", "Đang chọn tệp GPX", null)
@@ -270,6 +307,53 @@ class MainActivity : FlutterActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == RESTRICTION_IMPORT_REQUEST) {
+            val pending = pendingRestrictionImport ?: return
+            pendingRestrictionImport = null
+            val uri = if (resultCode == Activity.RESULT_OK) data?.data else null
+            if (uri == null) {
+                pending.success(null)
+                return
+            }
+            thread(name = "OsmRestrictionImport") {
+                try {
+                    val bytes = contentResolver.openInputStream(uri)?.use { input ->
+                        val out = java.io.ByteArrayOutputStream()
+                        val buffer = ByteArray(16_384)
+                        while (true) {
+                            val n = input.read(buffer)
+                            if (n < 0) break
+                            require(out.size() + n <= 8_000_000) {
+                                "Tệp cấm rẽ vượt quá 8 MB"
+                            }
+                            out.write(buffer, 0, n)
+                        }
+                        out.toByteArray()
+                    } ?: throw IllegalArgumentException("Không đọc được tệp")
+                    val source = "OSM:phone-import:" + uri.lastPathSegment.orEmpty().take(128)
+                    val parsed = vn.g98g00107.thanhtaxixanh.driver.car
+                        .OsmTurnRestrictionParser.parse(bytes.toString(Charsets.UTF_8), source)
+                    require(parsed.rejected == 0 && parsed.relations.isNotEmpty()) {
+                        "Tệp có quan hệ bị loại hoặc không có quan hệ hợp lệ; không ghi đè"
+                    }
+                    val saved = vn.g98g00107.thanhtaxixanh.driver.car
+                        .OsmRestrictionSqliteStore.replace(
+                            applicationContext, parsed.relations, source)
+                    runOnUiThread {
+                        pending.success(mapOf(
+                            "relations" to saved.count,
+                            "rejected" to parsed.rejected,
+                            "status" to "UNVERIFIED_REVIEW_ONLY"
+                        ))
+                    }
+                } catch (e: Exception) {
+                    runOnUiThread {
+                        pending.error("RESTRICTION_IMPORT_FAILED", e.message, null)
+                    }
+                }
+            }
+            return
+        }
         if (requestCode == GPX_REVIEW_REQUEST) {
             val pending = pendingGpxImport ?: return
             pendingGpxImport = null
@@ -438,6 +522,9 @@ class MainActivity : FlutterActivity() {
         pendingLocationPermission?.error(
             "ACTIVITY_CLOSED", "Phone activity was closed during permission request", null)
         pendingLocationPermission = null
+        pendingRestrictionImport?.error(
+            "ACTIVITY_CLOSED", "Đã đóng màn hình khi chọn tệp cấm rẽ", null)
+        pendingRestrictionImport = null
         pendingTrafficImport?.error(
             "ACTIVITY_CLOSED", "Đã đóng màn hình khi chọn tệp biển báo", null)
         pendingTrafficImport = null
@@ -451,5 +538,6 @@ class MainActivity : FlutterActivity() {
         private const val ROAD_IMPORT_REQUEST = 4282
         private const val TRAFFIC_POINT_IMPORT_REQUEST = 4283
         private const val GPX_REVIEW_REQUEST = 4284
+        private const val RESTRICTION_IMPORT_REQUEST = 4285
     }
 }
