@@ -167,8 +167,8 @@ class LunarCalendar {
       final leapOff = _leapMonthOffset(a11);
       var leapMonth = leapOff - 2;
       if (leapMonth < 0) leapMonth += 12;
-      if (leap && m != leapMonth) return null;
-      if (leap || off >= leapOff) off++;
+      if (leap && m != leapMonth) { return null; }
+      if (leap || off >= leapOff) { off++; }
     } else if (leap) {
       return null;
     }
