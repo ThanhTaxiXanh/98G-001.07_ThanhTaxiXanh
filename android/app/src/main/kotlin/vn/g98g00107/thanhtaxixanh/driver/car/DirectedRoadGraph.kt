@@ -49,12 +49,12 @@ object DirectedRoadGraph {
             val (distance, edgeId) = queue.poll()
             if (distance > maxDistanceM) break
             if (distance > (best[edgeId] ?: Double.POSITIVE_INFINITY)) continue
+            if (edgeId == endEdge)
+                return Transition(true, distance, "CONNECTED_DIRECTED_PATH")
             val edge = byId[edgeId] ?: continue
             for (next in outgoing[edge.toNode].orEmpty()) {
                 if (TurnRestriction(edgeId, edge.toNode, next.id) in restrictions) continue
                 val nextDistance = distance + next.lengthM
-                if (next.id == endEdge && nextDistance <= maxDistanceM)
-                    return Transition(true, nextDistance, "CONNECTED_DIRECTED_PATH")
                 if (nextDistance < (best[next.id] ?: Double.POSITIVE_INFINITY) &&
                     nextDistance <= maxDistanceM) {
                     best[next.id] = nextDistance
