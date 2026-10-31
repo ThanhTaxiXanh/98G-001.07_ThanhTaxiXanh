@@ -53,14 +53,12 @@ class VietQr {
     if (utf8.encode(memo).length > 25) {
       throw const FormatException('Message exceeds 25 bytes');
     }
-    final beneficiary = tlv('00', bin) + tlv('01', account);
-    final merchant = tlv('00', 'A000000727') +
-        tlv('01', beneficiary) + tlv('02', 'QRIBFTTA');
-    final base = tlv('00', '01') + tlv('01', amount == null ? '11' : '12') +
-        tlv('38', merchant) + tlv('53', '704') +
-        (amount == null ? '' : tlv('54', '$amount')) +
-        tlv('58', 'VN') +
-        (memo.isEmpty ? '' : tlv('62', tlv('08', memo))) + '6304';
+    final beneficiary = "${tlv('00', bin)}${tlv('01', account)}";
+    final merchant = "${tlv('00', 'A000000727')}${tlv('01', beneficiary)}${tlv('02', 'QRIBFTTA')}";
+    final base = "${tlv('00', '01')}${tlv('01', amount == null ? '11' : '12')}"
+        "${tlv('38', merchant)}${tlv('53', '704')}"
+        "${amount == null ? '' : tlv('54', '$amount')}"
+        "${tlv('58', 'VN')}${memo.isEmpty ? '' : tlv('62', tlv('08', memo))}6304";
     return '$base${crc16(base).toRadixString(16).toUpperCase().padLeft(4, '0')}';
   }
 }

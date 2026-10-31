@@ -259,7 +259,7 @@ class _SettingsHomeState extends State<SettingsHome> {
         final d = int.tryParse(eventDay.text);
         final m = int.tryParse(eventMonth.text);
         if (eventTitle.text.trim().isEmpty || d == null ||
-            m == null || d < 1 || m < 1 || m > 12) return;
+            m == null || d < 1 || m < 1 || m > 12) { return; }
         try {
           DateTime(2028, m, d);
           final limit = DateTime(2028, m + 1, 0).day;
