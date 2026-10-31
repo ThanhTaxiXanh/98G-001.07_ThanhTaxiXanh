@@ -652,6 +652,10 @@ class _SettingsHomeState extends State<SettingsHome> {
           'Không tìm thấy: ${gpxReview!['coverageMissing']} · '
           'Đường song song/mơ hồ: ${gpxReview!['coverageAmbiguous']} · '
           'Quá nhiều ứng viên: ${gpxReview!['coverageOverloaded']}. '
+          'Topology khớp: ${gpxReview!['directedMatched']} · '
+          'Thiếu dữ liệu: ${gpxReview!['directedMissing']} · '
+          'Mơ hồ: ${gpxReview!['directedAmbiguous']} · '
+          'Không kết nối: ${gpxReview!['directedDisconnected']}. '
           'Chỉ phân tích, chưa xác nhận đoạn đường.'),
     if (roadStatus['available'] == true)
       OutlinedButton.icon(
