@@ -14,7 +14,6 @@ void main() {
   testWidgets('live map starts disabled and can be toggled without Android',
       (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-    addTearDown(() => debugDefaultTargetPlatformOverride = null);
     SharedPreferences.setMockInitialValues({});
     final store = LayoutStore();
     await tester.pumpWidget(MaterialApp(home: SettingsHome(store: store)));
@@ -28,12 +27,12 @@ void main() {
     await tester.pump();
     expect(find.byType(LiveMapTile), findsNothing);
     store.dispose();
+    debugDefaultTargetPlatformOverride = null;
   });
 
   testWidgets('native map opt-in is bounded by 12x12 preview at varied ratios',
       (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
-    addTearDown(() => debugDefaultTargetPlatformOverride = null);
     for (final size in [(934, 844), (1920, 720), (800, 1280)]) {
       await tester.pumpWidget(MaterialApp(
         home: Scaffold(body: SingleChildScrollView(
@@ -50,5 +49,6 @@ void main() {
       expect(find.byType(LiveMapTile), findsOneWidget);
       expect(tester.takeException(), isNull);
     }
+    debugDefaultTargetPlatformOverride = null;
   });
 }
