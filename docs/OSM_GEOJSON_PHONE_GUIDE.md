@@ -53,3 +53,13 @@ Trên điện thoại, sau khi nhập vùng đầu tiên, bấm **Nhập bổ su
 - Nếu **cùng hình học nhưng tốc độ hoặc hướng đi mâu thuẫn**, ứng dụng **giữ lại cả hai bản ghi** để ghép GPS có thể trả **Giới hạn: -- (chưa rõ)** thay vì áp đặt một tốc độ chưa kiểm chứng. Đây chưa phải hệ thống kiểm duyệt biển báo thực địa.
 - Trang Bản đồ hiển thị số đoạn mới ghi và số đoạn trùng bỏ qua ở lần nhập ghi thành công gần nhất. Những tệp có trùng một phần có thể ghi ít hơn số đoạn nguồn.
 - Cập nhật từ M4.1 lên M4.2 tự xây bảng định danh cho các đoạn cũ trong giao dịch nâng cấp SQLite, không xóa đường cũ. Các bản sao đã có từ trước được giữ nguyên trong lần nâng cấp; việc hợp nhất/xử lý xung đột của dữ liệu lịch sử sẽ được thực hiện ở giai đoạn tiếp theo.
+
+## M4.3 — Rà soát SQLite và dọn bản sao cũ (thực hiện trên điện thoại Android)
+
+1. Vào **Bản đồ** → **Rà soát dữ liệu SQLite**. Thao tác chỉ đọc, không sửa bất kỳ đoạn đường nào. Kết quả gồm tổng đoạn đường, bản sao tiềm năng từ dữ liệu M4.1, và số bản ghi RTree/B-tree.
+2. Nếu kiểm tra cấu trúc có vấn đề, ứng dụng sẽ cảnh báo; không thực hiện dọn tự động. Dữ liệu OSM không phải nguồn chứng nhận tốc độ giao thông.
+3. Khi có bản sao cũ, bấm **Dọn bản sao cũ (cần xác nhận)** và đọc hộp thoại trước khi đồng ý. Lệnh chạy trên luồng nền, trong một giao dịch SQLite. Nếu phát hiện fingerprint không khớp hoặc dữ liệu bất thường, mọi thay đổi bị hoàn tác.
+4. Chỉ các bản ghi có **cùng tọa độ đoạn đường và cùng thuộc tính tốc độ, chiều đường, tên đường** được xếp vào diện xóa. Những bản ghi có tốc độ khác nhau được giữ lại để bộ ghép GPS có thể trả `Giới hạn: -- (chưa rõ)`. Không xử lý tranh chấp tốc độ bằng bỏ phiếu hoặc lựa chọn bản ghi mới nhất.
+5. Sau khi dọn, ngắt và kết nối lại Android Auto để kiểm tra kết quả khi lái thử **ở vị trí an toàn**, không thao tác ứng dụng trên điện thoại khi đang điều khiển xe.
+
+**Giới hạn:** chỉ phát hiện bản sao thực sự trùng (canonical fingerprint) đã có trong dữ liệu cũ. Báo cáo kiểm tra cấu trúc SQLite chưa phải kiểm toán toàn bộ nguồn dữ liệu, chưa kết luận độ đúng hoặc độ mới của một biển tốc độ. Việc dọn trùng không thay đổi tệp VietQR và các sự kiện cá nhân.

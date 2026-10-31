@@ -10,3 +10,5 @@ M2 OSM snapshot map: renderer is implemented but Android Auto host rendering is 
 M4 vẫn dùng GeoJSON giới hạn 8 MB và 50.000 đoạn; chỉ **khả năng truy vấn** dùng SQLite RTree, chưa có nhập dữ liệu Việt Nam quy mô lớn hoặc xác minh biển báo trên xe thật. Bộ kiểm thử SQLite chạy Robolectric chưa thay thế Android instrumentation.
 
 M4.2: nhận diện bản sao đoạn đường từ các tệp khác nhau nhưng không tự sửa mâu thuẫn maxspeed, không khử bản sao có sẵn từ dữ liệu cũ và không bảo đảm dữ liệu OSM đã kiểm chứng tại hiện trường.
+
+M4.3 bổ sung rà soát chỉ mục và dọn bản sao chính xác từ dữ liệu cũ có xác nhận người dùng. Báo cáo không xác minh giới hạn tốc độ tại hiện trường; thao tác không tự chọn giữa các nguồn OSM mâu thuẫn. Chưa nghiệm thu xe thật hay hiệu năng với đủ 1 triệu đoạn.

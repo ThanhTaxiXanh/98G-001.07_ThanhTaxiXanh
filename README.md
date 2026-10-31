@@ -1,6 +1,6 @@
 # THANHTAXIXANH SMART AUTO — V5
 
-**Mốc đang triển khai: M4.2 (prototype; M4.1 CI/APK đã đạt, M4.2 đang kiểm thử).** Android Auto projection là đích hiển thị chính; điện thoại Android chỉ **Cài đặt + Xem trước thiết kế**. Không gọi preview trên điện thoại là dashboard thực tế trên xe.
+**Mốc đang triển khai: M4.3 (prototype; M4.2 CI/APK đã đạt, M4.3 đang kiểm thử).** Android Auto projection là đích hiển thị chính; điện thoại Android chỉ **Cài đặt + Xem trước thiết kế**. Không gọi preview trên điện thoại là dashboard thực tế trên xe.
 
 - Repo: ThanhTaxiXanh/98G-001.07_ThanhTaxiXanh
 - Kotlin namespace / Android applicationId: `vn.g98g00107.thanhtaxixanh.driver`
@@ -28,3 +28,7 @@ GitHub Actions [CI](.github/workflows/ci.yml) chạy format, Flutter analyze/tes
 - `AA_EXACT_2COL_3ROW`: BLOCKED_BY_PLATFORM cho thiết kế tùy ý; cần kiểm chứng riêng nếu host có capability phù hợp.
 
 Mọi giới hạn và tiến độ trong [docs/FEATURE_MATRIX.md](docs/FEATURE_MATRIX.md), [docs/CAR_DASHBOARD_FEASIBILITY.md](docs/CAR_DASHBOARD_FEASIBILITY.md).
+
+## M4.3 — Kiểm tra dữ liệu offline
+
+Trang Bản đồ trên điện thoại có nút **Rà soát dữ liệu SQLite** (chỉ đọc) và nút **Dọn bản sao cũ** có xác nhận người dùng; cleanup dùng transaction, có kiểm tra fingerprint trước khi xóa và tuyệt đối không bỏ các bản ghi maxspeed mâu thuẫn. Chi tiết tại [hướng dẫn GeoJSON và rà soát](docs/OSM_GEOJSON_PHONE_GUIDE.md). CI M4.3 phải hoàn thành trước khi coi APK bản này sẵn sàng thử.
