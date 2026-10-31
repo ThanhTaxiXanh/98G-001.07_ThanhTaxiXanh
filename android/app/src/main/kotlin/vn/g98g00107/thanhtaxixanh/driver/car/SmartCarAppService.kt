@@ -6,6 +6,8 @@ import androidx.car.app.AppManager
 import androidx.car.app.CarAppService
 import androidx.car.app.Screen
 import androidx.car.app.Session
+import androidx.car.app.model.Action
+import androidx.car.app.model.ActionStrip
 import androidx.car.app.navigation.model.NavigationTemplate
 import androidx.car.app.model.Template
 import androidx.car.app.validation.HostValidator
@@ -31,7 +33,21 @@ private class SmartSession : Session() {
         carContext.getCarService(AppManager::class.java)
             .setSurfaceCallback(CarDiagnosticSurface())
         return object : Screen(carContext) {
-            override fun onGetTemplate(): Template = NavigationTemplate.Builder().build()
+            override fun onGetTemplate(): Template =
+                NavigationTemplate.Builder()
+                    .setActionStrip(
+                        ActionStrip.Builder()
+                            .addAction(
+                                Action.Builder()
+                                    .setTitle("Kiểm tra")
+                                    .setOnClickListener {
+                                        Log.i("ThanhTaxiCar", "Diagnostic host action tapped")
+                                    }
+                                    .build()
+                            )
+                            .build()
+                    )
+                    .build()
         }
     }
 }
