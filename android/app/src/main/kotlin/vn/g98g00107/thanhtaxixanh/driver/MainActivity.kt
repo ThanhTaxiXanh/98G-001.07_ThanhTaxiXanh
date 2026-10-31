@@ -45,6 +45,37 @@ class MainActivity : FlutterActivity() {
                         }
                     }
                 }
+                "getRoadQuality" -> {
+                    thread(name = "RoadQualityAudit") {
+                        try {
+                            vn.g98g00107.thanhtaxixanh.driver.car.OsmRoadSqliteStore
+                                .migrateLegacy(applicationContext)
+                            val quality = vn.g98g00107.thanhtaxixanh.driver.car.OsmRoadSqliteStore
+                                .audit(applicationContext).asMap()
+                            runOnUiThread { result.success(quality) }
+                        } catch (e: Exception) {
+                            runOnUiThread {
+                                result.error("ROAD_AUDIT_FAILED", e.message, null)
+                            }
+                        }
+                    }
+                }
+                "cleanLegacyRoadDuplicates" -> {
+                    thread(name = "RoadLegacyCleanup") {
+                        try {
+                            val quality = vn.g98g00107.thanhtaxixanh.driver.car.OsmRoadSqliteStore
+                                .cleanLegacyDuplicates(applicationContext).asMap()
+                            val status = OsmRoadStatus()
+                            runOnUiThread {
+                                result.success(mapOf("quality" to quality, "status" to status))
+                            }
+                        } catch (e: Exception) {
+                            runOnUiThread {
+                                result.error("ROAD_CLEANUP_FAILED", e.message, null)
+                            }
+                        }
+                    }
+                }
                 "importRoadGeoJson" -> {
                     if (pendingRoadImport != null) {
                         result.error("ALREADY_IMPORTING", "Đã có tệp đang được chọn", null)
