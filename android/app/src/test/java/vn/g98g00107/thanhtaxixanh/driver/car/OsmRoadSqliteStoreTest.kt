@@ -54,6 +54,27 @@ class OsmRoadSqliteStoreTest {
         assertEquals(1, OsmRoadSqliteStore.status(context)["segments"])
     }
 
+    @Test fun appendingDifferentRegionsPreservesBoth() {
+        OsmRoadSqliteStore.replace(context, listOf(road("North")), 1,
+            sourceFingerprint = "source-A")
+        OsmRoadSqliteStore.replace(context, listOf(road("South", 22.0)), 1,
+            append = true, sourceFingerprint = "source-B")
+        assertEquals(2, OsmRoadSqliteStore.status(context)["segments"])
+        assertEquals(2, OsmRoadSqliteStore.status(context)["features"])
+        assertEquals("North", OsmRoadSqliteStore.nearby(
+            context, 21.0005, 106.0)!!.single().name)
+        assertEquals("South", OsmRoadSqliteStore.nearby(
+            context, 22.0005, 106.0)!!.single().name)
+    }
+
+    @Test fun identicalFileFingerprintSkipped() {
+        OsmRoadSqliteStore.replace(context, listOf(road("A")), 1,
+            sourceFingerprint = "source-A")
+        OsmRoadSqliteStore.replace(context, listOf(road("A")), 1,
+            append = true, sourceFingerprint = "source-A")
+        assertEquals(1, OsmRoadSqliteStore.status(context)["segments"])
+    }
+
     @Test fun metadataAndClearAreConsistent() {
         val info = OsmRoadSqliteStore.replace(context, listOf(road("A")), 5)
         assertTrue(info.importedAt > 0)

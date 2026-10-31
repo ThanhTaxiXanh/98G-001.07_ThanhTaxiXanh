@@ -147,7 +147,7 @@ class _SettingsHomeState extends State<SettingsHome> {
     }
   }
 
-  Future<void> _importRoadGeoJson() async {
+  Future<void> _importRoadGeoJson({bool append = false}) async {
     if (roadBusy) {
       return;
     }
@@ -157,7 +157,7 @@ class _SettingsHomeState extends State<SettingsHome> {
     });
     try {
       final status = await locationChannel.invokeMapMethod<String, dynamic>(
-        'importRoadGeoJson');
+        'importRoadGeoJson', {'append': append});
       if (mounted && status != null) {
         setState(() => roadStatus = Map<String, dynamic>.from(status));
       }
@@ -355,7 +355,7 @@ class _SettingsHomeState extends State<SettingsHome> {
       Text(locationError, style: const TextStyle(color: Colors.orange)),
     _section('Dữ liệu tốc độ OSM · SQLite RTree (M4)'),
     Text(roadStatus['available'] == true
-        ? 'Đã nhập: ${roadStatus['segments']} đoạn đường có maxspeed'
+        ? 'Đã nhập: ${roadStatus['segments']} / ${roadStatus['maximumSegments'] ?? 1000000} đoạn đường có maxspeed'
         : 'Chưa nhập dữ liệu đường. Tốc độ giới hạn hiển thị là --.'),
     const Text('Dữ liệu đã lưu theo chỉ mục SQLite RTree để tra cứu gần GPS. '
         'Chọn GeoJSON FeatureCollection xuất từ OpenStreetMap hoặc '
@@ -366,8 +366,15 @@ class _SettingsHomeState extends State<SettingsHome> {
     FilledButton.icon(
       onPressed: roadBusy ? null : () => unawaited(_importRoadGeoJson()),
       icon: const Icon(Icons.file_open),
-      label: Text(roadBusy ? 'Đang nhập dữ liệu…' : 'Nhập GeoJSON từ điện thoại'),
+      label: Text(roadBusy ? 'Đang nhập dữ liệu…' : 'Thay toàn bộ bằng tệp GeoJSON'),
     ),
+    if (roadStatus['available'] == true)
+      OutlinedButton.icon(
+        onPressed: roadBusy ? null
+            : () => unawaited(_importRoadGeoJson(append: true)),
+        icon: const Icon(Icons.library_add),
+        label: const Text('Nhập bổ sung khu vực (giữ dữ liệu cũ)'),
+      ),
     if (roadStatus['available'] == true)
       TextButton.icon(
         onPressed: roadBusy ? null : () => unawaited(_deleteRoadGeoJson()),

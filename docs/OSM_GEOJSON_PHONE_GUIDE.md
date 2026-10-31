@@ -42,3 +42,7 @@ OSM: https://wiki.openstreetmap.org/wiki/Key:maxspeed . Cấu trúc Overpass Tur
 Không nhập GeoJSON từ nguồn không đáng tin. Tệp được giới hạn dung lượng, lưu riêng trong bộ nhớ ứng dụng; có nút xóa dữ liệu maxspeed.
 Dữ liệu OpenStreetMap theo ODbL. Ghi nguồn © OpenStreetMap contributors và tuân thủ điều kiện dữ liệu phái sinh nếu phân phối: https://www.openstreetmap.org/copyright .
 Không phải bộ dữ liệu toàn quốc; cần cơ sở dữ liệu SQLite/RTree cho giai đoạn sau.
+
+## M4.1 — Nhập bổ sung nhiều khu vực
+
+Trên điện thoại, sau khi nhập vùng đầu tiên, bấm **Nhập bổ sung khu vực (giữ dữ liệu cũ)** để chọn thêm GeoJSON khác. Mỗi tệp vẫn tối đa 8 MB / 50.000 đoạn, còn tổng cơ sở SQLite M4.1 có giới hạn an toàn 1.000.000 đoạn. Nhập cùng một tệp giống hệt sẽ bị bỏ qua theo SHA-256; tuy nhiên hai tệp khác nhau vẫn có thể có đoạn đường trùng nhau nếu vùng xuất chồng lấn. Chức năng **Thay toàn bộ bằng tệp GeoJSON** xóa các đoạn đường trước đó trong cùng giao dịch SQLite và chỉ ghi tệp mới nếu hợp lệ. M4.1 không tự thu thập hoặc xác thực biển báo ngoài thực tế.

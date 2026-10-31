@@ -13,6 +13,7 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private var pendingLocationPermission: MethodChannel.Result? = null
     private var pendingRoadImport: MethodChannel.Result? = null
+    private var pendingRoadAppend = false
 
     private fun locationGranted(): Boolean =
         checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
@@ -49,6 +50,7 @@ class MainActivity : FlutterActivity() {
                         result.error("ALREADY_IMPORTING", "Đã có tệp đang được chọn", null)
                     } else {
                         pendingRoadImport = result
+                        pendingRoadAppend = call.argument<Boolean>("append") == true
                         try {
                             val picker = Intent(Intent.ACTION_OPEN_DOCUMENT)
                                 .addCategory(Intent.CATEGORY_OPENABLE)
@@ -105,6 +107,8 @@ class MainActivity : FlutterActivity() {
         if (requestCode != ROAD_IMPORT_REQUEST) return
         val pending = pendingRoadImport ?: return
         pendingRoadImport = null
+        val append = pendingRoadAppend
+        pendingRoadAppend = false
         val uri: Uri? = if (resultCode == Activity.RESULT_OK) data?.data else null
         if (uri == null) {
             pending.success(null) // User canceled. Keep existing imported data.
@@ -113,7 +117,7 @@ class MainActivity : FlutterActivity() {
         thread(name = "OsmRoadGeoJsonImport") {
             try {
                 vn.g98g00107.thanhtaxixanh.driver.car.OsmRoadSqliteStore
-                    .importGeoJson(applicationContext, uri)
+                    .importGeoJson(applicationContext, uri, append)
                 runOnUiThread {
                     pending.success(OsmRoadStatus())
                 }
