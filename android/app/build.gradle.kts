@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -23,7 +25,7 @@ android {
     }
     signingConfigs {
         create("releaseUpload") {
-            val props = java.util.Properties()
+            val props = Properties()
             val file = rootProject.file("key.properties")
             if (file.exists()) file.inputStream().use { props.load(it) }
             val keystorePath = props.getProperty("storeFile")
