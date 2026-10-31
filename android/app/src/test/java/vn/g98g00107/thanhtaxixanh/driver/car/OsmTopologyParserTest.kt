@@ -2,7 +2,12 @@ package vn.g98g00107.thanhtaxixanh.driver.car
 
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [28])
 class OsmTopologyParserTest {
     private fun geo(props: String, coordinates: String = "[[106.0,21.0],[106.001,21.0]]") =
         """{"type":"FeatureCollection","features":[{"type":"Feature","id":999,
