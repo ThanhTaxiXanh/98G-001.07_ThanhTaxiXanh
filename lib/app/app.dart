@@ -126,6 +126,16 @@ class _SettingsHomeState extends State<SettingsHome> {
               ? '' : 'Chưa cấp quyền vị trí. Có thể mở Cài đặt Android để cấp lại.';
         });
       }
+      if (granted == true && liveMapEnabled) {
+        try {
+          await locationChannel.invokeMethod<void>(
+            'phoneMapPreviewCommand', {'action': 'refreshGps'});
+        } on MissingPluginException {
+          // Only available on Android with the live phone map.
+        } on PlatformException {
+          // The map can still be reconnected with the refresh GPS button.
+        }
+      }
     } on MissingPluginException {
       if (mounted) {
         setState(() => locationError = 'Chỉ cấp quyền trên thiết bị Android.');

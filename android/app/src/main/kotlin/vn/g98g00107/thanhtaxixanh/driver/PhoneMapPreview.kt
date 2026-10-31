@@ -12,6 +12,7 @@ import android.os.Debug
 import android.os.SystemClock
 import android.util.Log
 import android.view.View
+import android.widget.TextView
 import io.flutter.plugin.common.StandardMessageCodec
 import io.flutter.plugin.platform.PlatformView
 import io.flutter.plugin.platform.PlatformViewFactory
@@ -32,21 +33,38 @@ class PhoneMapPreviewFactory(private val activity: Activity) :
     private var view: PhoneMapPreview? = null
     private var hostStarted = false
     private var hostResumed = false
+    private var errorStatus: String? = null
 
     override fun create(context: Context, viewId: Int, args: Any?): PlatformView {
         view?.dispose()
-        val created = PhoneMapPreview(context, viewId) {
-            if (view?.id == viewId) view = null
+        errorStatus = null
+        return try {
+            val created = PhoneMapPreview(context, viewId) {
+                if (view?.id == viewId) view = null
+            }
+            view = created
+            if (hostStarted) created.start()
+            if (hostResumed) created.resume()
+            created
+        } catch (e: Exception) {
+            Log.e("ThanhTaxiPhoneMap", "MapLibre phone preview failed", e)
+            errorStatus = "Không khởi tạo được MapLibre: " +
+                (e.message ?: "thiết bị không hỗ trợ")
+            object : PlatformView {
+                private val fallback = TextView(context).apply {
+                    text = errorStatus
+                    setTextColor(Color.WHITE)
+                    setBackgroundColor(Color.rgb(9, 22, 34))
+                }
+                override fun getView(): View = fallback
+                override fun dispose() {}
+            }
         }
-        view = created
-        if (hostStarted) created.start()
-        if (hostResumed) created.resume()
-        return created
     }
 
     fun command(action: String, enabled: Boolean?): Map<String, Any> =
         view?.command(action, enabled) ?: mapOf(
-            "ready" to false, "status" to "Đang chờ bật bản đồ động",
+            "ready" to false, "status" to (errorStatus ?: "Đang chờ bật bản đồ động"),
             "source" to "MapLibre phone only", "fps" to 0.0,
             "javaHeapMb" to 0.0, "nativeHeapMb" to 0.0
         )
