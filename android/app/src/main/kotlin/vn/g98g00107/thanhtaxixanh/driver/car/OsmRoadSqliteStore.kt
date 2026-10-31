@@ -238,9 +238,13 @@ object OsmRoadSqliteStore {
     @Synchronized
     fun replace(context: Context, roads: List<OsmRoadSegment>,
                 featureCount: Int, append: Boolean = false,
-                sourceFingerprint: String? = null): Summary {
+                sourceFingerprint: String? = null,
+                topology: List<OsmTopologyParser.Link>? = null): Summary {
         require(roads.isNotEmpty() && roads.size <= OsmRoadCatalog.MAX_SEGMENTS) {
             "Số lượng đoạn đường ngoài giới hạn M4"
+        }
+        require(topology == null || (!append && topology.size == roads.size)) {
+            "Topology requires a full replacement with one link per road"
         }
         val db = database(context)
         val now = System.currentTimeMillis()
@@ -281,12 +285,18 @@ object OsmRoadSqliteStore {
                 val updateFingerprint = db.compileStatement("""
                     UPDATE road_fingerprints SET road_id=? WHERE fingerprint=?
                 """.trimIndent())
+                val insertTopology = if (topology != null) db.compileStatement("""
+                    INSERT INTO road_topology
+                    (road_id,osm_way_id,from_osm_node,to_osm_node,layer,bridge,tunnel,source)
+                    VALUES (?,?,?,?,?,?,?,?)
+                """.trimIndent()) else null
                 try {
-                    for (road in roads) {
+                    for ((roadIndex, road) in roads.withIndex()) {
                         val fingerprint = OsmRoadFingerprint.sha256(road)
                         reserveFingerprint.clearBindings()
                         reserveFingerprint.bindString(1, fingerprint)
                         if (reserveFingerprint.executeInsert() == -1L) {
+                            require(topology == null) { "Duplicate topology geometry; refusing ambiguous import" }
                             skipped++
                             continue
                         }
@@ -320,6 +330,24 @@ object OsmRoadSqliteStore {
                         insertIndex.bindDouble(4, minOf(road.lon1, road.lon2))
                         insertIndex.bindDouble(5, maxOf(road.lon1, road.lon2))
                         insertIndex.executeInsert()
+                        if (insertTopology != null) {
+                            val link = topology!![roadIndex]
+                            require(link.wayId.matches(Regex("[1-9][0-9]{0,18}")) &&
+                                link.fromNode.matches(Regex("[1-9][0-9]{0,18}")) &&
+                                link.toNode.matches(Regex("[1-9][0-9]{0,18}")) &&
+                                link.fromNode != link.toNode &&
+                                link.source.isNotBlank() && link.source.length <= 256)
+                            insertTopology.clearBindings()
+                            insertTopology.bindLong(1, id)
+                            insertTopology.bindString(2, link.wayId)
+                            insertTopology.bindString(3, link.fromNode)
+                            insertTopology.bindString(4, link.toNode)
+                            link.layer?.let { insertTopology.bindLong(5, it.toLong()) }
+                            insertTopology.bindLong(6, if (link.bridge) 1 else 0)
+                            insertTopology.bindLong(7, if (link.tunnel) 1 else 0)
+                            insertTopology.bindString(8, link.source)
+                            check(insertTopology.executeInsert() > 0)
+                        }
                         inserted++
                     }
                 } finally {
