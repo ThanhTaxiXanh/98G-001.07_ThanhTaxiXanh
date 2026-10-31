@@ -20,3 +20,18 @@
 | SQLite RTree spatial filtering | M4 native DB | M4 (PENDING_CAR_TEST) | NOT_TARGETED |
 
 | Khử trùng theo đoạn + chuyển DB v1→v2 | M4.2 native SQLite | M4.2 (CI_PENDING, CAR_PENDING) | NOT_TARGETED |
+
+## M5.1 — Dữ liệu ứng viên biển báo/camera (bổ sung 31/10/2026)
+
+| Thành phần | Phone Android | Android Auto projection |
+|---|---|---|
+| Nhập GeoJSON Point (5 MB/10.000) | IMPLEMENTED / CI_PENDING | KHÔNG NHẬP TRÊN CAR |
+| Kho SQLite traffic_points_m5.sqlite (≤100.000) | IMPLEMENTED / CI_PENDING | NOT_CONNECTED |
+| Xác minh nguồn & giấy phép bắt buộc | FORMAT_VALIDATION | CHƯA KIỂM DUYỆT THỰC ĐỊA |
+| Trùng điểm, append/replace transaction | UNIT_CODE / CI_PENDING | N/A |
+| Các điểm import luôn UNVERIFIED | UNIT_CODE / CI_PENDING | KHÔNG PHÁT CẢNH BÁO |
+| Converter Overpass Turbo GeoJSON (HTML local) | IMPLEMENTED / BROWSER_TEST_PENDING | N/A |
+| Ghép hướng + làn + hiệu lực + camera vào tuyến | NOT_IMPLEMENTED | NOT_IMPLEMENTED |
+| Android Auto VF e34 thực tế | N/A | PENDING_DEVICE_TEST |
+
+M5.1 không nâng trạng thái CAR_2COL3ROW_REAL_SCREEN; vẫn BLOCKED_BY_PLATFORM với layout tự do.
