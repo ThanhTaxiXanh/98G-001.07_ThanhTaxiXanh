@@ -148,7 +148,9 @@ object OsmRoadSqliteStore {
                 "storage" to ("SQLite " + (meta(db, "indexType") ?: "Unknown")),
                 "maximumSegments" to MAX_TOTAL_SEGMENTS,
                 "lastAdded" to (meta(db, "lastAdded")?.toIntOrNull() ?: 0),
-                "lastSkippedDuplicates" to (meta(db, "lastSkippedDuplicates")?.toIntOrNull() ?: 0)
+                "lastSkippedDuplicates" to (meta(db, "lastSkippedDuplicates")?.toIntOrNull() ?: 0),
+                "lastCleanedDuplicates" to (meta(db, "lastCleanedDuplicates")?.toIntOrNull() ?: 0),
+                "lastCleanedAt" to (meta(db, "lastCleanedAt")?.toLongOrNull() ?: 0L)
             )
         } finally {
             db.close()
@@ -440,6 +442,130 @@ object OsmRoadSqliteStore {
         val db = database(context)
         return try {
             auditDatabase(db)
+        } finally {
+            db.close()
+        }
+    }
+
+    /**
+     * Explicit, user-triggered M4.3 cleanup. Only exact canonical duplicates
+     * left behind by M4.1 are eligible. No speed conflict is ever resolved.
+     *
+     * Verify that every representative and candidate fingerprint matches
+     * before deleting anything. SQL savepoints are handled by the outer
+     * transaction: any failure keeps all original roads and spatial rows.
+     */
+    @Synchronized
+    fun cleanLegacyDuplicates(context: Context): QualityReport {
+        val db = database(context)
+        try {
+            db.beginTransaction()
+            try {
+                val before = auditDatabase(db)
+                require(before.integrityOk) {
+                    "Chỉ mục dữ liệu bị lỗi; không thể tự dọn. Hãy sao lưu và kiểm tra."
+                }
+                // A corrupted fingerprint table must never authorize deletion.
+                db.rawQuery("""
+                    SELECT f.fingerprint,r.lat1,r.lon1,r.lat2,r.lon2,
+                           r.base_kmh,r.forward_kmh,r.backward_kmh,r.oneway,r.name
+                    FROM road_fingerprints f JOIN roads r ON f.road_id=r.id
+                """.trimIndent(), null).use { cursor ->
+                    while (cursor.moveToNext()) {
+                        val segment = OsmRoadSegment(
+                            cursor.getDouble(1), cursor.getDouble(2),
+                            cursor.getDouble(3), cursor.getDouble(4),
+                            if (cursor.isNull(5)) null else cursor.getInt(5),
+                            if (cursor.isNull(6)) null else cursor.getInt(6),
+                            if (cursor.isNull(7)) null else cursor.getInt(7),
+                            cursor.getInt(8), cursor.getString(9) ?: ""
+                        )
+                        check(cursor.getString(0) == OsmRoadFingerprint.sha256(segment)) {
+                            "Sai định danh đoạn đường; đã hủy dọn dữ liệu."
+                        }
+                    }
+                }
+                var removed = 0
+                if (before.potentialLegacyDuplicates > 0) {
+                    db.execSQL("""
+                        CREATE TEMP TABLE IF NOT EXISTS cleanup_duplicate_ids(
+                            id INTEGER PRIMARY KEY
+                        )
+                    """.trimIndent())
+                    db.execSQL("DELETE FROM temp.cleanup_duplicate_ids")
+                    val insert = db.compileStatement(
+                        "INSERT INTO temp.cleanup_duplicate_ids(id) VALUES(?)")
+                    try {
+                        db.rawQuery("""
+                            SELECT r.id,r.lat1,r.lon1,r.lat2,r.lon2,
+                                   r.base_kmh,r.forward_kmh,r.backward_kmh,
+                                   r.oneway,r.name
+                            FROM roads r
+                            WHERE NOT EXISTS (
+                                SELECT 1 FROM road_fingerprints f WHERE f.road_id=r.id
+                            ) ORDER BY r.id
+                        """.trimIndent(), null).use { cursor ->
+                            while (cursor.moveToNext()) {
+                                val segment = OsmRoadSegment(
+                                    cursor.getDouble(1), cursor.getDouble(2),
+                                    cursor.getDouble(3), cursor.getDouble(4),
+                                    if (cursor.isNull(5)) null else cursor.getInt(5),
+                                    if (cursor.isNull(6)) null else cursor.getInt(6),
+                                    if (cursor.isNull(7)) null else cursor.getInt(7),
+                                    cursor.getInt(8), cursor.getString(9) ?: ""
+                                )
+                                val fingerprint = OsmRoadFingerprint.sha256(segment)
+                                val exists = db.rawQuery(
+                                    "SELECT 1 FROM road_fingerprints WHERE fingerprint=?",
+                                    arrayOf(fingerprint)
+                                ).use { it.moveToFirst() }
+                                check(exists) {
+                                    "Phát hiện đoạn đường chưa được lập chỉ mục; không xóa."
+                                }
+                                insert.clearBindings()
+                                insert.bindLong(1, cursor.getLong(0))
+                                check(insert.executeInsert() > 0) {
+                                    "Không tạo được danh sách dọn trùng"
+                                }
+                                removed++
+                            }
+                        }
+                    } finally {
+                        insert.close()
+                    }
+                    check(removed == before.potentialLegacyDuplicates) {
+                        "Kiểm đếm bản sao không nhất quán; đã hủy thao tác."
+                    }
+                    db.execSQL("""
+                        DELETE FROM road_rtree WHERE id IN (
+                            SELECT id FROM temp.cleanup_duplicate_ids
+                        )
+                    """.trimIndent())
+                    db.execSQL("""
+                        DELETE FROM roads WHERE id IN (
+                            SELECT id FROM temp.cleanup_duplicate_ids
+                        )
+                    """.trimIndent())
+                    db.execSQL("DELETE FROM temp.cleanup_duplicate_ids")
+                }
+                val after = auditDatabase(db)
+                check(after.integrityOk && after.potentialLegacyDuplicates == 0 &&
+                    after.segments == before.segments - removed) {
+                    "Kết quả sau dọn không nhất quán; đã hoàn tác."
+                }
+                db.execSQL("""
+                    INSERT OR REPLACE INTO metadata(key,value)
+                    VALUES('lastCleanedDuplicates',?)
+                """.trimIndent(), arrayOf(removed.toString()))
+                db.execSQL("""
+                    INSERT OR REPLACE INTO metadata(key,value)
+                    VALUES('lastCleanedAt',?)
+                """.trimIndent(), arrayOf(System.currentTimeMillis().toString()))
+                db.setTransactionSuccessful()
+                return after
+            } finally {
+                db.endTransaction()
+            }
         } finally {
             db.close()
         }
