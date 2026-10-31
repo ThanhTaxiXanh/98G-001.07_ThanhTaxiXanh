@@ -1,7 +1,6 @@
 package vn.g98g00107.thanhtaxixanh.driver.car
 
 import android.content.Context
-import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
