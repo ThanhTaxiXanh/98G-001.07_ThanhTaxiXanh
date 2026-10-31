@@ -175,7 +175,7 @@ class LunarCalendar {
     final solar = _date(_newMoonDay(k + off) + d - 1);
     final back = solarToLunar(solar.day, solar.month, solar.year);
     if (back.day != d || back.month != m ||
-        back.year != y || back.isLeap != leap) return null;
+        back.year != y || back.isLeap != leap) { return null; }
     return solar;
   }
 

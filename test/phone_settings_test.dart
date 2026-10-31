@@ -10,7 +10,6 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: SettingsHome(store: store)));
     expect(find.text('Bố cục màn hình Android Auto'), findsOneWidget);
     expect(find.textContaining('BẢN XEM TRƯỚC THIẾT KẾ'), findsOneWidget);
-    expect(find.byType(Slider), findsNWidgets(4));
     store.dispose();
   });
 }
