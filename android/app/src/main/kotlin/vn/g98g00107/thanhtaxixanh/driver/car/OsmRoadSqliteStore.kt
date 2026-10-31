@@ -376,6 +376,75 @@ object OsmRoadSqliteStore {
         }
     }
 
+
+    data class QualityReport(
+        val segments: Int,
+        val fingerprintRows: Int,
+        val spatialRows: Int,
+        val potentialLegacyDuplicates: Int,
+        val brokenFingerprints: Int,
+        val missingSpatialRows: Int,
+        val orphanSpatialRows: Int
+    ) {
+        val integrityOk: Boolean
+            get() = brokenFingerprints == 0 && missingSpatialRows == 0 &&
+                orphanSpatialRows == 0 && fingerprintRows <= segments
+
+        fun asMap(): Map<String, Any> = mapOf(
+            "segments" to segments,
+            "fingerprints" to fingerprintRows,
+            "spatialRows" to spatialRows,
+            "legacyDuplicates" to potentialLegacyDuplicates,
+            "brokenFingerprints" to brokenFingerprints,
+            "missingSpatialRows" to missingSpatialRows,
+            "orphanSpatialRows" to orphanSpatialRows,
+            "integrityOk" to integrityOk
+        )
+    }
+
+    private fun countQuery(db: SQLiteDatabase, sql: String): Int =
+        db.rawQuery(sql, null).use {
+            if (it.moveToFirst()) it.getInt(0) else 0
+        }
+
+    /**
+     * M4.3 read-only integrity audit. This does NOT infer speed-limit truth.
+     * Duplicate count is based on the v2 canonical-fingerprint representative.
+     * A damaged fingerprint index will be flagged instead of silently repaired.
+     */
+    private fun auditDatabase(db: SQLiteDatabase): QualityReport {
+        val segments = count(db)
+        val fingerprints = countQuery(db, "SELECT COUNT(*) FROM road_fingerprints")
+        val spatial = countQuery(db, "SELECT COUNT(*) FROM road_rtree")
+        val broken = countQuery(db, """
+            SELECT COUNT(*) FROM road_fingerprints f
+            LEFT JOIN roads r ON f.road_id=r.id WHERE r.id IS NULL
+        """.trimIndent())
+        val missing = countQuery(db, """
+            SELECT COUNT(*) FROM roads r
+            LEFT JOIN road_rtree i ON i.id=r.id WHERE i.id IS NULL
+        """.trimIndent())
+        val orphans = countQuery(db, """
+            SELECT COUNT(*) FROM road_rtree i
+            LEFT JOIN roads r ON r.id=i.id WHERE r.id IS NULL
+        """.trimIndent())
+        return QualityReport(
+            segments, fingerprints, spatial,
+            (segments - fingerprints).coerceAtLeast(0),
+            broken, missing, orphans
+        )
+    }
+
+    @Synchronized
+    fun audit(context: Context): QualityReport {
+        val db = database(context)
+        return try {
+            auditDatabase(db)
+        } finally {
+            db.close()
+        }
+    }
+
     @Synchronized
     fun clear(context: Context) {
         // Delete the contents transactionally, preserving a valid SQLite schema.
