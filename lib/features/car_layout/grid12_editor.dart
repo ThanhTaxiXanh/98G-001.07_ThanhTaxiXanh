@@ -22,6 +22,18 @@ class _Grid12EditorState extends State<Grid12Editor> {
   bool resize = false, rejected = false;
   double w = 1, h = 1;
 
+  void shift(GridPanel neighbor, int delta, bool vertical) {
+    try {
+      final next = value.shiftBoundary(selected, neighbor, delta,
+          vertical: vertical);
+      setState(() => preview = next);
+      widget.onEdited(next);
+    } on FormatException {
+      widget.onRejected?.call('Không thể thay đổi ranh giới: ô quá nhỏ hoặc không liền kề.');
+    }
+  }
+
+
   Grid12Layout get value => preview ?? widget.layout;
 
   void begin(DragStartDetails d) {
@@ -84,7 +96,9 @@ class _Grid12EditorState extends State<Grid12Editor> {
   }
 
   @override
-  Widget build(BuildContext context) => AspectRatio(
+  Widget build(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [AspectRatio(
     aspectRatio: widget.ratio,
     child: LayoutBuilder(builder: (context, box) {
       w = box.maxWidth;
@@ -110,7 +124,37 @@ class _Grid12EditorState extends State<Grid12Editor> {
         ),
       );
     }),
-  );
+  ),
+    const SizedBox(height: 8),
+    Text('Ô đang chọn: ${selected.name} · Chạm ô để chọn; kéo để di chuyển.'),
+    const SizedBox(height: 6),
+    for (final neighbor in value.tiles.where((t) => t.panel != selected &&
+        t.panel != GridPanel.icons &&
+        selected != GridPanel.icons &&
+        ((value.tile(selected).x == t.x &&
+          value.tile(selected).width == t.width &&
+          value.tile(selected).y + value.tile(selected).height == t.y) ||
+         (value.tile(selected).y == t.y &&
+          value.tile(selected).height == t.height &&
+          value.tile(selected).x + value.tile(selected).width == t.x))))
+      Builder(builder: (context) {
+        final a = value.tile(selected);
+        final vertical = a.x == neighbor.x && a.width == neighbor.width;
+        return Row(children: [
+          Expanded(child: Text(
+            vertical ? 'Chia hàng với ${neighbor.panel.name}' :
+                'Chia cột với ${neighbor.panel.name}')),
+          IconButton(
+            tooltip: 'Giảm 1 ô lưới',
+            onPressed: () => shift(neighbor.panel, -1, vertical),
+            icon: const Icon(Icons.remove_circle_outline)),
+          IconButton(
+            tooltip: 'Tăng 1 ô lưới',
+            onPressed: () => shift(neighbor.panel, 1, vertical),
+            icon: const Icon(Icons.add_circle_outline)),
+        ]);
+      }),
+  ]);
 }
 
 class Grid12EditorPainter extends CustomPainter {
