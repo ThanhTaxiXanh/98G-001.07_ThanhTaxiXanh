@@ -713,6 +713,7 @@ class _SettingsHomeState extends State<SettingsHome> {
           'Ánh xạ được: ${gpxReview!['resolvedRestrictionRelations']} · '
           'Chưa ánh xạ: ${gpxReview!['unresolvedRestrictionRelations']} · '
           'Chuyển tiếp bị hạn chế theo dữ liệu: ${gpxReview!['directedProhibitedTurn']}. '
+          'Đồng nhất dữ liệu OSM: ${gpxReview!['restrictionCompatibility']}. '
           'Chỉ phân tích, chưa xác nhận đoạn đường.'),
     if (roadStatus['available'] == true)
       OutlinedButton.icon(
