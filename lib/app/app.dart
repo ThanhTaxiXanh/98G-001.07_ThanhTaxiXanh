@@ -263,7 +263,7 @@ class _SettingsHomeState extends State<SettingsHome> {
         try {
           DateTime(2028, m, d);
           final limit = DateTime(2028, m + 1, 0).day;
-          if (d > limit) return;
+          if (d > limit) { return; }
         } catch (_) { return; }
         setState(() => events.add({
           'title': eventTitle.text.trim(), 'day': d, 'month': m,

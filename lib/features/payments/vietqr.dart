@@ -61,6 +61,6 @@ class VietQr {
         (amount == null ? '' : tlv('54', '$amount')) +
         tlv('58', 'VN') +
         (memo.isEmpty ? '' : tlv('62', tlv('08', memo))) + '6304';
-    return base + crc16(base).toRadixString(16).toUpperCase().padLeft(4, '0');
+    return '$base${crc16(base).toRadixString(16).toUpperCase().padLeft(4, '0')}';
   }
 }

@@ -23,6 +23,8 @@ jobs:
           cache: true
       - name: Generate missing platform scaffolding (no overwrite)
         run: flutter create --platforms=android --org vn.g98g00107.thanhtaxixanh --project-name thanhtaxixanh_driver .
+      - name: Remove generated starter test (actual tests are tracked)
+        run: rm -f test/widget_test.dart
       - name: Resolve dependencies
         run: flutter pub get
       - name: Format workspace then verify
