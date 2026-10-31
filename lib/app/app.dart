@@ -379,7 +379,7 @@ class _SettingsHomeState extends State<SettingsHome> {
 
     SwitchListTile(
       title: const Text('Bản đồ 3D'),
-      subtitle: const Text('Tùy chọn thiết kế; chưa tích hợp renderer MapLibre'),
+      subtitle: const Text('Bản đồ Android Auto đã có MapLibre 2D; chưa hỗ trợ 3D.'),
       value: c.map3d,
       onChanged: (v) => unawaited(widget.store.update(c.copyWith(map3d: v))),
     ),
@@ -638,7 +638,7 @@ class _SettingsHomeState extends State<SettingsHome> {
     const ListTile(
       leading: Icon(Icons.build_circle_outlined),
       title: Text('Giai đoạn hiện tại'),
-      subtitle: Text('M0–M1 • bản chạy thử, chưa có điều hướng thực'),
+      subtitle: Text('M3 • OSM maxspeed theo vùng, chưa có định tuyến thực'),
     ),
   ]);
 }

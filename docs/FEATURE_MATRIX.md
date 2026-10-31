@@ -1,4 +1,4 @@
-# Bảng tính năng (2026-10-31)
+# Bảng tính năng M3 (2026-10-31)
 
 | Tính năng | Phone | Android Auto projection | AAOS |
 |---|---|---|---|
@@ -15,3 +15,4 @@
 | Audio MediaLibraryService | NOT_IMPLEMENTED | NOT_IMPLEMENTED | NOT_IMPLEMENTED |
 | YouTube video/WebView trong xe | KHÔNG LÀM PLAYER PHONE | BLOCKED_BY_PLATFORM (đang lái) | UNVERIFIED |
 | Contribute biển/camera, SQLite | NOT_IMPLEMENTED | NOT_IMPLEMENTED | NOT_IMPLEMENTED |
+| Nhập OSM GeoJSON maxspeed vùng nhỏ | M3 UI/Storage | Native matcher + PIP / PENDING_CAR_TEST | NOT_TARGETED |
