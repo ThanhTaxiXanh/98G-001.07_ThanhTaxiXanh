@@ -709,6 +709,10 @@ class _SettingsHomeState extends State<SettingsHome> {
           'Không kết nối: ${gpxReview!['directedDisconnected']} · '
           'Sai hướng: ${gpxReview!['directedInvalidHeading']} · '
           'Thời gian bất hợp lý: ${gpxReview!['directedImplausibleTime']}. '
+          'Quan hệ cấm rẽ đã nhập: ${gpxReview!['restrictionRelations']} · '
+          'Ánh xạ được: ${gpxReview!['resolvedRestrictionRelations']} · '
+          'Chưa ánh xạ: ${gpxReview!['unresolvedRestrictionRelations']} · '
+          'Chuyển tiếp bị hạn chế theo dữ liệu: ${gpxReview!['directedProhibitedTurn']}. '
           'Chỉ phân tích, chưa xác nhận đoạn đường.'),
     if (roadStatus['available'] == true)
       OutlinedButton.icon(
