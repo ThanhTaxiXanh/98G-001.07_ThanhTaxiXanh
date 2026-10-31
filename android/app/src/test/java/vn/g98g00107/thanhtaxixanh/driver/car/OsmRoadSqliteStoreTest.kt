@@ -157,6 +157,105 @@ class OsmRoadSqliteStoreTest {
         assertEquals(1, OsmRoadSqliteStore.status(context)["segments"])
     }
 
+
+    private fun injectLegacyCopy(speed: Int = 60, name: String = "Duplicate") {
+        val db = context.openOrCreateDatabase(
+            "osm_roads_m4.sqlite", Context.MODE_PRIVATE, null)
+        try {
+            db.execSQL("""
+                INSERT INTO roads(lat1,lon1,lat2,lon2,base_kmh,oneway,name)
+                VALUES(21.0,106.0,21.001,106.0,?,0,?)
+            """.trimIndent(), arrayOf(speed, name))
+            val id = db.rawQuery("SELECT MAX(id) FROM roads", null).use {
+                assertTrue(it.moveToFirst())
+                it.getLong(0)
+            }
+            db.execSQL("""
+                INSERT INTO road_rtree(id,min_lat,max_lat,min_lon,max_lon)
+                VALUES(?,21.0,21.001,106.0,106.0)
+            """.trimIndent(), arrayOf(id))
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test fun auditIsReadOnlyAndCountsLegacyDuplicates() {
+        OsmRoadSqliteStore.replace(context, listOf(road("Duplicate")), 1)
+        injectLegacyCopy()
+        val before = OsmRoadSqliteStore.audit(context)
+        assertEquals(2, before.segments)
+        assertEquals(1, before.fingerprintRows)
+        assertEquals(2, before.spatialRows)
+        assertEquals(1, before.potentialLegacyDuplicates)
+        assertTrue(before.integrityOk)
+        assertEquals(2, OsmRoadSqliteStore.status(context)["segments"])
+    }
+
+    @Test fun cleanupDeletesOnlyExactLegacyDuplicatesAndSpatialRows() {
+        OsmRoadSqliteStore.replace(context, listOf(
+            road("Duplicate"), road("Conflict", kmh = 40)), 2)
+        injectLegacyCopy()
+        val after = OsmRoadSqliteStore.cleanLegacyDuplicates(context)
+        assertTrue(after.integrityOk)
+        assertEquals(0, after.potentialLegacyDuplicates)
+        assertEquals(2, after.segments)
+        assertEquals(2, after.spatialRows)
+        assertEquals(1, OsmRoadSqliteStore.status(context)["lastCleanedDuplicates"])
+        val candidates = OsmRoadSqliteStore.nearby(
+            context, 21.0005, 106.0)!!
+        assertEquals(2, candidates.size)
+        assertNull(OsmRoadMatcher.match(
+            candidates, 21.0005, 106.0, 5.0, 0.0, 10.0))
+        assertEquals(0,
+            OsmRoadSqliteStore.cleanLegacyDuplicates(context)
+                .potentialLegacyDuplicates)
+    }
+
+    @Test fun cleanupRefusesUnindexedUniqueRoadAndRollsBack() {
+        OsmRoadSqliteStore.replace(context, listOf(road("Original")), 1)
+        injectLegacyCopy(speed = 40, name = "Different")
+        try {
+            OsmRoadSqliteStore.cleanLegacyDuplicates(context)
+            fail("Must not delete a row without an exact representative")
+        } catch (_: IllegalStateException) { }
+        assertEquals(2, OsmRoadSqliteStore.status(context)["segments"])
+        assertEquals(2, OsmRoadSqliteStore.audit(context).spatialRows)
+    }
+
+    @Test fun cleanupRefusesCorruptedRepresentativeFingerprint() {
+        OsmRoadSqliteStore.replace(context, listOf(road("Original")), 1)
+        val db = context.openOrCreateDatabase(
+            "osm_roads_m4.sqlite", Context.MODE_PRIVATE, null)
+        try {
+            db.execSQL("UPDATE road_fingerprints SET fingerprint='CORRUPTED'")
+        } finally {
+            db.close()
+        }
+        try {
+            OsmRoadSqliteStore.cleanLegacyDuplicates(context)
+            fail("Corrupted representative must block cleanup")
+        } catch (_: IllegalStateException) {}
+        assertEquals(1, OsmRoadSqliteStore.status(context)["segments"])
+    }
+
+    @Test fun auditDetectsMissingSpatialIndexRows() {
+        OsmRoadSqliteStore.replace(context, listOf(road("Original")), 1)
+        val db = context.openOrCreateDatabase(
+            "osm_roads_m4.sqlite", Context.MODE_PRIVATE, null)
+        try {
+            db.execSQL("DELETE FROM road_rtree")
+        } finally {
+            db.close()
+        }
+        val report = OsmRoadSqliteStore.audit(context)
+        assertFalse(report.integrityOk)
+        assertEquals(1, report.missingSpatialRows)
+        try {
+            OsmRoadSqliteStore.cleanLegacyDuplicates(context)
+            fail("Damaged spatial index should not be deleted")
+        } catch (_: IllegalArgumentException) {}
+    }
+
     @Test fun metadataAndClearAreConsistent() {
         val info = OsmRoadSqliteStore.replace(context, listOf(road("A")), 5)
         assertTrue(info.importedAt > 0)
