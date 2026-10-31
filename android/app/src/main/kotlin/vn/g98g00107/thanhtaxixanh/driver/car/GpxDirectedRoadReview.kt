@@ -77,7 +77,7 @@ object GpxDirectedRoadReview {
             if (previous != null && previous != roadId) {
                 val before = byRoad[previous].orEmpty()
                 val connected = before.any { a ->
-                    current.any { b -> a.to == b.from }
+                    current.any { b -> a.toNode == b.fromNode }
                 }
                 if (!connected) {
                     disconnected++
