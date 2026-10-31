@@ -14,6 +14,7 @@ class MainActivity : FlutterActivity() {
     private var pendingLocationPermission: MethodChannel.Result? = null
     private var pendingRoadImport: MethodChannel.Result? = null
     private var pendingRoadAppend = false
+    private var pendingTopologyImport = false
     private var pendingTrafficImport: MethodChannel.Result? = null
     private var pendingTrafficAppend = true
     private var phoneMapPreviewFactory: PhoneMapPreviewFactory? = null
@@ -170,6 +171,25 @@ class MainActivity : FlutterActivity() {
                         }
                     }
                 }
+                "importRoadTopologyGeoJson" -> {
+                    if (pendingRoadImport != null) {
+                        result.error("ALREADY_IMPORTING", "Đang chọn tệp đường", null)
+                    } else {
+                        pendingRoadImport = result
+                        pendingRoadAppend = false
+                        pendingTopologyImport = true
+                        try {
+                            val picker = Intent(Intent.ACTION_OPEN_DOCUMENT)
+                                .addCategory(Intent.CATEGORY_OPENABLE)
+                                .setType("*/*")
+                            startActivityForResult(picker, ROAD_IMPORT_REQUEST)
+                        } catch (e: Exception) {
+                            pendingRoadImport = null
+                            pendingTopologyImport = false
+                            result.error("PICKER_UNAVAILABLE", e.message, null)
+                        }
+                    }
+                }
                 "importRoadGeoJson" -> {
                     if (pendingRoadImport != null) {
                         result.error("ALREADY_IMPORTING", "Đã có tệp đang được chọn", null)
@@ -257,7 +277,9 @@ class MainActivity : FlutterActivity() {
         val pending = pendingRoadImport ?: return
         pendingRoadImport = null
         val append = pendingRoadAppend
+        val strictTopology = pendingTopologyImport
         pendingRoadAppend = false
+        pendingTopologyImport = false
         val uri: Uri? = if (resultCode == Activity.RESULT_OK) data?.data else null
         if (uri == null) {
             pending.success(null) // User canceled. Keep existing imported data.
@@ -265,8 +287,25 @@ class MainActivity : FlutterActivity() {
         }
         thread(name = "OsmRoadGeoJsonImport") {
             try {
-                vn.g98g00107.thanhtaxixanh.driver.car.OsmRoadSqliteStore
-                    .importGeoJson(applicationContext, uri, append)
+                if (strictTopology) {
+                    val bytes = contentResolver.openInputStream(uri)?.use { input ->
+                        val out = java.io.ByteArrayOutputStream()
+                        val buffer = ByteArray(16_384)
+                        while (true) {
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            require(out.size() + count <= 8_000_000) { "GeoJSON vượt 8 MB" }
+                            out.write(buffer, 0, count)
+                        }
+                        out.toByteArray()
+                    } ?: throw IllegalArgumentException("Không đọc được tệp")
+                    vn.g98g00107.thanhtaxixanh.driver.car.OsmRoadSqliteStore
+                        .importTopologyGeoJson(applicationContext,
+                            bytes.toString(Charsets.UTF_8), "User selected GeoJSON")
+                } else {
+                    vn.g98g00107.thanhtaxixanh.driver.car.OsmRoadSqliteStore
+                        .importGeoJson(applicationContext, uri, append)
+                }
                 // SQLite must finish on the worker, not inside the UI callback.
                 val status = OsmRoadStatus()
                 runOnUiThread {
