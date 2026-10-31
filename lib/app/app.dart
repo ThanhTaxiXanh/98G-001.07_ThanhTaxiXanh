@@ -63,6 +63,7 @@ class _SettingsHomeState extends State<SettingsHome> {
   bool? locationGranted;
   String locationError = '';
   Map<String, dynamic> roadStatus = {};
+  Map<String, dynamic>? roadQuality;
   String roadError = '';
   bool roadBusy = false;
   final eventStore = CalendarEventStore();
@@ -159,7 +160,10 @@ class _SettingsHomeState extends State<SettingsHome> {
       final status = await locationChannel.invokeMapMethod<String, dynamic>(
         'importRoadGeoJson', {'append': append});
       if (mounted && status != null) {
-        setState(() => roadStatus = Map<String, dynamic>.from(status));
+        setState(() {
+          roadStatus = Map<String, dynamic>.from(status);
+          roadQuality = null;
+        });
       }
     } on MissingPluginException {
       if (mounted) {
@@ -173,6 +177,80 @@ class _SettingsHomeState extends State<SettingsHome> {
       if (mounted) {
         setState(() => roadBusy = false);
       }
+    }
+  }
+
+  Future<void> _scanRoadQuality() async {
+    if (roadBusy) return;
+    setState(() {
+      roadBusy = true;
+      roadError = '';
+    });
+    try {
+      final quality = await locationChannel.invokeMapMethod<String, dynamic>(
+        'getRoadQuality');
+      if (mounted && quality != null) {
+        setState(() => roadQuality = Map<String, dynamic>.from(quality));
+      }
+    } on MissingPluginException {
+      if (mounted) setState(() => roadError = 'Chỉ rà soát trên Android.');
+    } on PlatformException catch (e) {
+      if (mounted) {
+        setState(() => roadError = e.message ?? 'Rà soát dữ liệu thất bại');
+      }
+    } finally {
+      if (mounted) setState(() => roadBusy = false);
+    }
+  }
+
+  Future<void> _cleanRoadDuplicates() async {
+    if (roadBusy || roadQuality?['integrityOk'] != true ||
+        (roadQuality?['legacyDuplicates'] as int? ?? 0) <= 0) {
+      return;
+    }
+    final count = roadQuality!['legacyDuplicates'] as int;
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Dọn các bản sao đoạn đường cũ?'),
+        content: Text('Đã tìm thấy $count bản sao khớp hoàn toàn. '
+            'Chỉ xóa các bản sao được xác thực, không xóa đường có tốc độ '
+            'mâu thuẫn. Nếu phát hiện chỉ mục hỏng, toàn bộ thao tác sẽ '
+            'được hoàn tác.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Hủy'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Xác nhận dọn trùng'),
+          ),
+        ],
+      ),
+    );
+    if (approved != true || !mounted || roadBusy) return;
+    setState(() {
+      roadBusy = true;
+      roadError = '';
+    });
+    try {
+      final outcome = await locationChannel.invokeMapMethod<String, dynamic>(
+        'cleanLegacyRoadDuplicates');
+      if (mounted && outcome != null) {
+        setState(() {
+          roadStatus = Map<String, dynamic>.from(
+            outcome['status'] as Map<dynamic, dynamic>? ?? {});
+          roadQuality = Map<String, dynamic>.from(
+            outcome['quality'] as Map<dynamic, dynamic>? ?? {});
+        });
+      }
+    } on PlatformException catch (e) {
+      if (mounted) {
+        setState(() => roadError = e.message ?? 'Dọn dữ liệu không thành công');
+      }
+    } finally {
+      if (mounted) setState(() => roadBusy = false);
     }
   }
 
@@ -200,6 +278,7 @@ class _SettingsHomeState extends State<SettingsHome> {
       if (mounted) {
         setState(() {
           roadStatus = Map<String, dynamic>.from(status ?? {});
+          roadQuality = null;
           roadError = '';
         });
       }
@@ -388,6 +467,33 @@ class _SettingsHomeState extends State<SettingsHome> {
         icon: const Icon(Icons.delete_outline),
         label: const Text('Xóa dữ liệu maxspeed đã nhập'),
       ),
+    _section('M4.3 · Rà soát chất lượng dữ liệu đã lưu'),
+    const Text('Rà soát chỉ đọc: kiểm đếm chỉ mục và các bản sao của '
+        'phiên bản cũ. Không đánh giá độ đúng của biển báo hoặc maxspeed.'),
+    OutlinedButton.icon(
+      onPressed: roadBusy || roadStatus['available'] != true
+          ? null : () => unawaited(_scanRoadQuality()),
+      icon: const Icon(Icons.fact_check_outlined),
+      label: Text(roadBusy ? 'Đang xử lý dữ liệu…' : 'Rà soát dữ liệu SQLite'),
+    ),
+    if (roadQuality != null) ...[
+      Text('Đoạn đường: ${roadQuality!['segments'] ?? '--'}'
+          ' • Trùng tiềm năng: ${roadQuality!['legacyDuplicates'] ?? '--'}'
+          ' • Bản ghi chỉ mục: ${roadQuality!['spatialRows'] ?? '--'}'),
+      Text(roadQuality!['integrityOk'] == true
+          ? 'Chỉ mục cấu trúc: nhất quán'
+          : 'CẢNH BÁO: chỉ mục không nhất quán, không được dọn tự động.'),
+      if (roadQuality!['integrityOk'] == true &&
+          (roadQuality!['legacyDuplicates'] as int? ?? 0) > 0)
+        OutlinedButton.icon(
+          onPressed: roadBusy ? null : () => unawaited(_cleanRoadDuplicates()),
+          icon: const Icon(Icons.cleaning_services_outlined),
+          label: const Text('Dọn bản sao cũ (cần xác nhận)'),
+        ),
+    ],
+    if ((roadStatus['lastCleanedAt'] as int? ?? 0) > 0)
+      Text('Lần dọn gần nhất: đã xóa '
+          '${roadStatus['lastCleanedDuplicates'] ?? 0} bản sao.'),
     if (roadError.isNotEmpty)
       Text(roadError, style: const TextStyle(color: Colors.orange)),
     const Text('Ngắt và kết nối lại Android Auto sau khi thay dữ liệu đường.'),
