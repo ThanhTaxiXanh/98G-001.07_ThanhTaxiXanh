@@ -17,3 +17,8 @@ Mã `lib/features/speed_rules/speed_rules.dart`; 13 kiểm thử gồm phân cá
 - Xuất vùng dữ liệu phù hợp từ https://overpass-turbo.eu (OSM tags highway và maxspeed). Giữ nguyên tọa độ WGS84 [lon, lat]. Không nhập ảnh/dataset YOLO biển báo như tọa độ.
 - Import đọc file và xác thực nội dung trên luồng nền. Car map tải snapshot khi khởi động; sau cập nhật hãy ngắt/kết nối lại Android Auto.
 - CI kiểm thử matcher bản địa bằng Gradle JUnit. Chưa đo hiệu năng trên xe; M3 này không đáp ứng bài toán đầy đủ đường/camera/biển báo Việt Nam.
+
+
+## M4 — SQLite RTree (native Android)
+
+`OsmRoadSqliteStore.kt`: schema `roads`, `road_rtree`, `metadata` sử dụng SQLiteOpenHelper, transactional replace; rtree `min_lat,max_lat,min_lon,max_lon` giới hạn vùng truy vấn quanh GPS 32m. Query có trần 128 ứng viên; vượt trần trả UNKNOWN. Kết quả vẫn đi qua `OsmRoadMatcher` M3 để xét hướng, sai số và mâu thuẫn. `MainActivity` gọi import/status/clear trên thread nền; CarSurface đọc gần GPS trên executor, không nạp toàn bộ dataset vào RAM. Có migration **một lần** từ file `osm_maxspeed_v1.geojson` của M3, chỉ xóa file cũ sau khi commit DB thành công. Khi cần đổi tệp, thao tác xóa/nhập là giao dịch không tự tạo speed mới. Hạn mức tệp M4 **vẫn 8MB / 50.000 segments**; SQLite RTree là tối ưu truy vấn, không có nghĩa đã hỗ trợ toàn quốc. Cần parser streaming + phân vùng và kiểm thử thiết bị trước khi tăng hạn mức. `Robolectric` kiểm thử index, transactional replacement và status trên Android giả lập trong Gradle CI. Chưa có GPS thực tế/xe thật.

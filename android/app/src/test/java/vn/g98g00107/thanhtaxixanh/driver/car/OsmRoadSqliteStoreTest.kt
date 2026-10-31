@@ -1,7 +1,7 @@
 package vn.g98g00107.thanhtaxixanh.driver.car
 
 import android.content.Context
-import androidx.test.core.app.ApplicationProvider
+import org.robolectric.RuntimeEnvironment
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
@@ -19,7 +19,7 @@ class OsmRoadSqliteStoreTest {
     )
 
     @Before fun reset() {
-        context = ApplicationProvider.getApplicationContext()
+        context = RuntimeEnvironment.getApplication()
         OsmRoadSqliteStore.clear(context)
     }
 

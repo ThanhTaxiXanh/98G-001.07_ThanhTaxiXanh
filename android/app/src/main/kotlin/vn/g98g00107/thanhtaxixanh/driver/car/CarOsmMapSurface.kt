@@ -48,7 +48,8 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
     private var lastFixAt = 0L
     private var speedKmh: Int? = null
     private var error: String? = null
-    private var roads: List<OsmRoadSegment> = emptyList()
+    private var roadCount = 0
+    private var lastLocation: Location? = null
     private var roadMatch: OsmSpeedMatch? = null
     private var worker: ExecutorService? = null
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -109,7 +110,8 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
         lastMap = null
         worker?.shutdownNow()
         worker = Executors.newSingleThreadExecutor()
-        roads = emptyList()
+        roadCount = 0
+        lastLocation = null
         roadMatch = null
         roadDataError = null
         targetSurface = container.surface
@@ -139,12 +141,16 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
         val queue = worker ?: return
         val version = generation
         queue.execute {
-            val parsed = runCatching { OsmRoadCatalog.load(context) }
+            val result = runCatching {
+                OsmRoadSqliteStore.migrateLegacy(context)
+                OsmRoadSqliteStore.status(context)
+            }
             mainHandler.post {
                 if (version == generation) {
-                    roads = parsed.getOrNull()?.roads ?: emptyList()
-                    roadDataError = parsed.exceptionOrNull()?.message
-                    Log.i(tag, "Imported OSM speed segments: " + roads.size)
+                    roadCount = (result.getOrNull()?.get("segments") as? Int) ?: 0
+                    roadDataError = result.exceptionOrNull()?.message
+                    Log.i(tag, "Indexed OSM road segments: " + roadCount)
+                    lastLocation?.let { matchRoadSpeed(it) }
                     drawFrame()
                 }
             }
@@ -153,9 +159,9 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
 
     private fun matchRoadSpeed(location: Location) {
         roadMatch = null
-        val dataset = roads
+        lastLocation = Location(location)
         val queue = worker ?: return
-        if (dataset.isEmpty()) return
+        if (roadCount == 0) return
         val accuracy = if (location.hasAccuracy()) location.accuracy.toDouble()
             else Double.POSITIVE_INFINITY
         val bearing = if (location.hasBearing() &&
@@ -169,11 +175,14 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
         val request = ++matchSequence
         val version = generation
         queue.execute {
-            val matched = OsmRoadMatcher.match(
-                dataset, lat, lon, accuracy, bearing, speed)
+            val result = runCatching {
+                val nearby = OsmRoadSqliteStore.nearby(context, lat, lon)
+                nearby?.let { OsmRoadMatcher.match(it, lat, lon, accuracy, bearing, speed) }
+            }
             mainHandler.post {
                 if (version == generation && request == matchSequence) {
-                    roadMatch = matched
+                    roadMatch = result.getOrNull()
+                    roadDataError = result.exceptionOrNull()?.message
                     drawFrame()
                 }
             }
@@ -275,8 +284,8 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
                 !hasFix -> "Đang chờ vị trí GPS"
                 System.currentTimeMillis() - lastFixAt > 120_000L -> "GPS đã cũ"
                 roadDataError != null -> "Dữ liệu đường bị lỗi"
-                roads.isEmpty() -> "Chưa nhập dữ liệu maxspeed"
-                else -> "OSM maxspeed: " + roads.size + " đoạn"
+                roadCount == 0 -> "Chưa nhập dữ liệu maxspeed"
+                else -> "SQLite RTree: " + roadCount + " đoạn"
             }
             canvas.drawText(status, x + 9f, y + 80f * scale, secondary)
             if (lastMap == null || error != null) {
@@ -317,6 +326,7 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
         matchSequence++
         worker?.shutdownNow()
         worker = null
+        lastLocation = null
         try { locationManager.removeUpdates(locationListener) }
         catch (_: Exception) {}
         snapshotter?.cancel()

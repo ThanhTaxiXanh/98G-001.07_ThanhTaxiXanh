@@ -32,7 +32,18 @@ class MainActivity : FlutterActivity() {
                     result.success(null)
                 }
                 "getLocationPermission" -> result.success(locationGranted())
-                "getRoadDataStatus" -> result.success(OsmRoadStatus())
+                "getRoadDataStatus" -> {
+                    thread(name = "RoadDbStatus") {
+                        try {
+                            vn.g98g00107.thanhtaxixanh.driver.car.OsmRoadSqliteStore
+                                .migrateLegacy(applicationContext)
+                            val status = OsmRoadStatus()
+                            runOnUiThread { result.success(status) }
+                        } catch (e: Exception) {
+                            runOnUiThread { result.error("DB_STATUS", e.message, null) }
+                        }
+                    }
+                }
                 "importRoadGeoJson" -> {
                     if (pendingRoadImport != null) {
                         result.error("ALREADY_IMPORTING", "Đã có tệp đang được chọn", null)
@@ -56,11 +67,15 @@ class MainActivity : FlutterActivity() {
                     }
                 }
                 "clearRoadGeoJson" -> {
-                    try {
-                        vn.g98g00107.thanhtaxixanh.driver.car.OsmRoadCatalog.clear(this)
-                        result.success(OsmRoadStatus())
-                    } catch (e: Exception) {
-                        result.error("DELETE_FAILED", e.message, null)
+                    thread(name = "RoadDbClear") {
+                        try {
+                            vn.g98g00107.thanhtaxixanh.driver.car.OsmRoadSqliteStore
+                                .clear(applicationContext)
+                            val status = OsmRoadStatus()
+                            runOnUiThread { result.success(status) }
+                        } catch (e: Exception) {
+                            runOnUiThread { result.error("DELETE_FAILED", e.message, null) }
+                        }
                     }
                 }
                 "requestLocationPermission" -> {
@@ -83,7 +98,7 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun OsmRoadStatus(): Map<String, Any> =
-        vn.g98g00107.thanhtaxixanh.driver.car.OsmRoadCatalog.status(this)
+        vn.g98g00107.thanhtaxixanh.driver.car.OsmRoadSqliteStore.status(applicationContext)
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
@@ -97,8 +112,8 @@ class MainActivity : FlutterActivity() {
         }
         thread(name = "OsmRoadGeoJsonImport") {
             try {
-                vn.g98g00107.thanhtaxixanh.driver.car.OsmRoadCatalog
-                    .importGeoJson(this, uri)
+                vn.g98g00107.thanhtaxixanh.driver.car.OsmRoadSqliteStore
+                    .importGeoJson(applicationContext, uri)
                 runOnUiThread {
                     pending.success(OsmRoadStatus())
                 }

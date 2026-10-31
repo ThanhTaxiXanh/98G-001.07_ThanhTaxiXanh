@@ -57,4 +57,5 @@ dependencies {
     implementation("androidx.car.app:app-projected:1.7.0")
     implementation("org.maplibre.gl:android-sdk-opengl:13.7.1")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.16.1")
 }
