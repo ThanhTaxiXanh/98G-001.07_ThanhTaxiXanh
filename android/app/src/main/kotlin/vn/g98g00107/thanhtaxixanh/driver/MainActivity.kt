@@ -304,6 +304,8 @@ class MainActivity : FlutterActivity() {
                         "directedMissing" to directed.missing,
                         "directedAmbiguous" to directed.ambiguous,
                         "directedDisconnected" to directed.disconnected,
+                        "directedInvalidHeading" to directed.invalidHeading,
+                        "directedImplausibleTime" to directed.implausibleTime,
                         "coverageCandidate" to coverage.candidatePoints,
                         "coverageMissing" to coverage.noRoadPoints,
                         "coverageOverloaded" to coverage.overloadedPoints,
