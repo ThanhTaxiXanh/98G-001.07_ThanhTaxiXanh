@@ -140,12 +140,24 @@ private class PhoneMapPreview(
             loaded.uiSettings.isScrollGesturesEnabled = true
             loaded.uiSettings.isRotateGesturesEnabled = true
             loaded.uiSettings.isTiltGesturesEnabled = true
+            loaded.addOnCameraMoveStartedListener { reason ->
+                // Let the user explore freely. The GPS button restores follow.
+                if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) {
+                    follow = false
+                }
+            }
             // Neutral overview is NOT the user's GPS position.
             loaded.cameraPosition = CameraPosition.Builder()
                 .target(LatLng(16.0, 107.5)).zoom(5.4).build()
             loaded.setStyle("https://tiles.openfreemap.org/styles/liberty") {
                 if (!destroyed) {
                     ready = true
+                    if (tilt3d) {
+                        val cam = loaded.cameraPosition
+                        loaded.cameraPosition = CameraPosition.Builder()
+                            .target(cam.target).zoom(cam.zoom)
+                            .bearing(cam.bearing).tilt(48.0).build()
+                    }
                     status = if (fix == null) "Bản đồ sẵn sàng · chờ GPS"
                         else "Bản đồ sẵn sàng · GPS"
                     if (fix != null && follow) moveToFix()
