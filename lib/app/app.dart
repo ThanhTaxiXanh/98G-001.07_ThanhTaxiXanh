@@ -8,6 +8,7 @@ import '../features/car_layout/grid12_editor.dart';
 import '../features/car_layout/layout_store.dart';
 import '../features/car_preview/car_preview.dart';
 import '../features/car_preview/car_surface_diagnostics_panel.dart';
+import '../features/traffic_signs/traffic_point_panel.dart';
 import '../features/payments/vietqr.dart';
 import '../features/lunar_calendar/lunar_calendar.dart';
 import '../features/events/calendar_events.dart';
@@ -595,6 +596,8 @@ class _SettingsHomeState extends State<SettingsHome> {
     if (roadError.isNotEmpty)
       Text(roadError, style: const TextStyle(color: Colors.orange)),
     const Text('Ngắt và kết nối lại Android Auto sau khi thay dữ liệu đường.'),
+    _section('M5.1 · Kho biển báo / camera có tọa độ'),
+    const TrafficPointPanel(),
     _section('M4.4C · Chẩn đoán Android Auto trên xe'),
     const CarSurfaceDiagnosticsPanel(),
 
