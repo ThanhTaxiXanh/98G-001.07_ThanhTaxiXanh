@@ -18,6 +18,38 @@ class _TrafficPointPanelState extends State<TrafficPointPanel> {
   Map<String, dynamic> status = const {};
   bool busy = false;
   String? error;
+  Map<String, dynamic>? review;
+  final latController = TextEditingController(text: '21.2815');
+  final lonController = TextEditingController(text: '106.2083');
+
+  @override
+  void dispose() {
+    latController.dispose();
+    lonController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _review() async {
+    final lat = double.tryParse(latController.text.trim());
+    final lon = double.tryParse(lonController.text.trim());
+    if (lat == null || lon == null || !lat.isFinite || !lon.isFinite) {
+      setState(() => error = 'Tọa độ không hợp lệ.');
+      return;
+    }
+    setState(() { busy = true; error = null; review = null; });
+    try {
+      final result = await channel.invokeMapMethod<String, dynamic>(
+        'reviewTrafficPointsNear', {'lat': lat, 'lon': lon});
+      if (mounted && result != null) setState(() => review = Map<String, dynamic>.from(result));
+    } on PlatformException catch (e) {
+      if (mounted) setState(() => error = e.message ?? 'Không đọc được điểm.');
+    } on MissingPluginException {
+      if (mounted) setState(() => error = 'Chỉ hỗ trợ Android.');
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
 
   @override
   void initState() {
@@ -161,6 +193,37 @@ class _TrafficPointPanelState extends State<TrafficPointPanel> {
             ],
           ],
         ),
+        const Divider(),
+        const Text('M5.2B • Kiểm tra ứng viên quanh tọa độ (chỉ trên điện thoại)'),
+        TextField(controller: latController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(labelText: 'Vĩ độ (lat)')),
+        TextField(controller: lonController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(labelText: 'Kinh độ (lon)')),
+        OutlinedButton.icon(
+          onPressed: busy ? null : () => unawaited(_review()),
+          icon: const Icon(Icons.fact_check_outlined),
+          label: const Text('Xem điểm ứng viên gần tọa độ'),
+        ),
+        if (review != null) ...[
+          Text('Kết quả: ${review!['returned'] ?? 0} điểm; '
+              'chỉ để kiểm tra, không phát cảnh báo.'),
+          if (review!['truncated'] == true)
+            const Text('Danh sách giới hạn 50 điểm. Hãy thu hẹp khu vực.'),
+          for (final item in (review!['points'] is List
+              ? review!['points'] as List : const []))
+            if (item is Map)
+              Card(child: ListTile(
+                title: Text('${item['kind'] ?? 'unknown'} • UNVERIFIED'),
+                subtitle: Text(
+                  'Nguồn: ${item['source'] ?? '?'} '
+                  '(${item['license'] ?? '?'})\n'
+                  'Vị trí: ${item['lat']}, ${item['lon']}\n'
+                  'Đối chiếu đường: ${item['roadReview'] ?? '?'}\n'
+                  'Khoảng cách hình học: ${item['nearestDistanceM'] ?? '?'} m'),
+              )),
+        ],
         if (busy) const LinearProgressIndicator(),
         if (error != null)
           Text(error!, style: const TextStyle(color: Colors.orange)),
