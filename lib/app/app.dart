@@ -464,8 +464,7 @@ class _SettingsHomeState extends State<SettingsHome> {
           (c.targetWidthPx, c.targetHeightPx),
         })
           DropdownMenuItem(value: profile,
-              child: Text(profile.$1.toString() + ' × ' +
-                  profile.$2.toString() + ' px')),
+              child: Text('${profile.$1} × ${profile.$2} px')),
       ],
       onChanged: (value) {
         if (value != null) {
