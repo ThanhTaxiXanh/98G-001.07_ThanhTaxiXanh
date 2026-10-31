@@ -38,6 +38,7 @@ class CarDiagnosticSurface : SurfaceCallback {
     }
     override fun onSurfaceDestroyed(surfaceContainer: SurfaceContainer) {
         Log.i("ThanhTaxiCar", "Surface destroyed")
+        surfaceContainer.surface?.release()
     }
     override fun onVisibleAreaChanged(visibleArea: Rect) {
         Log.i("ThanhTaxiCar", "visible area: $visibleArea")

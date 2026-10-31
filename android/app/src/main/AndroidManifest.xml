@@ -1,5 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="androidx.car.app.NAVIGATION_TEMPLATES"/>
+    <uses-permission android:name="androidx.car.app.ACCESS_SURFACE"/>
     <application
         android:label="ThanhTaxiXanh Smart Auto"
         android:name="${applicationName}"
