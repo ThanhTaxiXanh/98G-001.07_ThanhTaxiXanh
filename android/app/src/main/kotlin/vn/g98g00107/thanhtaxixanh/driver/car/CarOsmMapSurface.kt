@@ -8,6 +8,9 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
+import android.graphics.RectF
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
@@ -257,11 +260,21 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
         try {
             canvas = surface.lockCanvas(null)
             canvas.drawColor(Color.rgb(9, 21, 33))
-            lastMap?.takeIf { !it.isRecycled }?.let {
-                canvas.drawBitmap(it, null, Rect(0, 0, width, height),
-                    Paint(Paint.FILTER_BITMAP_FLAG))
-            }
             val safeViewport = safeViewport()
+            // AA host controls the safe drawing rectangle. Render only inside
+            // that rectangle; never draw custom tiles under host controls.
+            val dashboard = safeViewport.overlaySafe &&
+                safeViewport.bounds.width() >= 460 &&
+                safeViewport.bounds.height() >= 230
+            val mapArea = if (dashboard) {
+                val bounds = safeViewport.bounds
+                Rect(bounds.left, bounds.top,
+                    bounds.left + (bounds.width() * 0.67f).toInt(), bounds.bottom)
+            } else Rect(0, 0, width, height)
+            lastMap?.takeIf { !it.isRecycled }?.let {
+                canvas.drawBitmap(it, null, mapArea, Paint(Paint.FILTER_BITMAP_FLAG))
+            }
+            if (dashboard) drawDashboardTiles(canvas, safeViewport.bounds)
             // Always render the map to the host Surface. If the host has not
             // provided reliable insets, do NOT put speed/HUD above host chrome.
             if (!safeViewport.overlaySafe || safeViewport.bounds.width() < 180 ||
@@ -321,6 +334,44 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
                     Log.w(tag, "Unable to post host surface", e)
                 }
             }
+        }
+    }
+
+    /**
+     * AA host Surface preview only: fixed, noninteractive status tiles.
+     * Calendar, QR and media integrations require separate verified sources.
+     */
+    private fun drawDashboardTiles(canvas: Canvas, safe: Rect) {
+        val left = safe.left + (safe.width() * 0.67f).toInt() + 5f
+        val right = safe.right - 5f
+        val gap = 6f
+        val top = safe.top + 5f
+        val bottom = safe.bottom - 5f
+        val tileHeight = (bottom - top - gap * 2f) / 3f
+        val panel = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.rgb(20, 34, 49)
+        }
+        val title = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = (safe.height() / 19f).coerceIn(12f, 21f)
+            isFakeBoldText = true
+        }
+        val subtitle = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.rgb(180, 199, 215)
+            textSize = (safe.height() / 26f).coerceIn(10f, 16f)
+        }
+        val labels = arrayOf("LỊCH VIỆT NAM", "MÃ QR THANH TOÁN", "MEDIA")
+        val details = arrayOf(
+            LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),
+            "Chưa chọn ảnh QR",
+            "Chưa kết nối trình phát"
+        )
+        for (i in 0..2) {
+            val y = top + i * (tileHeight + gap)
+            canvas.drawRoundRect(RectF(left, y, right, y + tileHeight), 10f, 10f, panel)
+            val textX = left + 10f
+            canvas.drawText(labels[i], textX, y + tileHeight * 0.42f, title)
+            canvas.drawText(details[i], textX, y + tileHeight * 0.72f, subtitle)
         }
     }
 
