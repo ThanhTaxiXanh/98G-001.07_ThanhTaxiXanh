@@ -65,6 +65,25 @@ class MainActivity : FlutterActivity() {
                         result.error("PHONE_MAP_COMMAND", e.message, null)
                     }
                 }
+                "reviewTrafficPointsNear" -> {
+                    val lat = call.argument<Double>("lat")
+                    val lon = call.argument<Double>("lon")
+                    if (lat == null || lon == null) {
+                        result.error("INVALID_LOCATION", "Cần lat và lon", null)
+                    } else {
+                        thread(name = "TrafficPointPhoneReview") {
+                            try {
+                                val report = vn.g98g00107.thanhtaxixanh.driver.car
+                                    .TrafficPointReviewService.inspect(applicationContext, lat, lon)
+                                runOnUiThread { result.success(report) }
+                            } catch (e: Exception) {
+                                runOnUiThread {
+                                    result.error("TRAFFIC_REVIEW_FAILED", e.message, null)
+                                }
+                            }
+                        }
+                    }
+                }
                 "getTrafficPointStatus" -> {
                     thread(name = "TrafficPointStatus") {
                         try {
