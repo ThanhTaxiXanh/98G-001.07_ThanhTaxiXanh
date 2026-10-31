@@ -22,7 +22,7 @@ import kotlin.math.max
  */
 object OsmRoadSqliteStore {
     private const val DATABASE = "osm_roads_m4.sqlite"
-    private const val SCHEMA = 2
+    private const val SCHEMA = 3
     private const val MAX_MATCH_CANDIDATES = 128
     const val MAX_TOTAL_SEGMENTS = 1_000_000
 
@@ -43,6 +43,7 @@ object OsmRoadSqliteStore {
             """.trimIndent())
             db.execSQL("CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
             OsmRoadSqliteStore.createFingerprintTable(db)
+            OsmRoadSqliteStore.createTopologyTable(db)
             // Some Android ROMs and Robolectric SQLite builds omit SQLITE_ENABLE_RTREE.
             // A failed CREATE VIRTUAL TABLE may still reserve the table name on some
             // SQLite implementations, so ROLLBACK the DDL using a nested SAVEPOINT.
@@ -78,13 +79,16 @@ object OsmRoadSqliteStore {
         }
 
         override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-            if (oldVersion == 1 && newVersion == 2) {
+            require(newVersion == 3 && oldVersion in 1..2) {
+                "Unsupported road DB schema: $oldVersion to $newVersion"
+            }
+            if (oldVersion == 1) {
                 OsmRoadSqliteStore.createFingerprintTable(db)
                 OsmRoadSqliteStore.backfillFingerprints(db)
-            } else {
-                // Never wipe road data automatically.
-                throw IllegalStateException("Unsupported road DB schema: $oldVersion to $newVersion")
             }
+            // Old rows deliberately remain WITHOUT topology identifiers.
+            // No way/node IDs are guessed from geometry.
+            OsmRoadSqliteStore.createTopologyTable(db)
         }
     }
 
@@ -97,6 +101,25 @@ object OsmRoadSqliteStore {
                 road_id INTEGER NOT NULL
             )
         """.trimIndent())
+    }
+
+    /** Optional topology sidecar. Empty for legacy and current GeoJSON imports.
+     * A future verified OSM-node import must populate this transactionally.
+     */
+    private fun createTopologyTable(db: SQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS road_topology (
+                road_id INTEGER PRIMARY KEY NOT NULL,
+                osm_way_id TEXT NOT NULL,
+                from_osm_node TEXT NOT NULL,
+                to_osm_node TEXT NOT NULL,
+                layer INTEGER,
+                bridge INTEGER NOT NULL DEFAULT 0,
+                tunnel INTEGER NOT NULL DEFAULT 0,
+                source TEXT NOT NULL
+            )
+        """.trimIndent())
+        db.execSQL("CREATE INDEX IF NOT EXISTS road_topology_way ON road_topology(osm_way_id)")
     }
 
     /** Version 1 had no segment keys; preserve all old roads while indexing
@@ -237,6 +260,7 @@ object OsmRoadSqliteStore {
             try {
                 if (!append) {
                     db.execSQL("DELETE FROM road_rtree")
+                    db.execSQL("DELETE FROM road_topology")
                     db.execSQL("DELETE FROM roads")
                     db.execSQL("DELETE FROM road_fingerprints")
                     db.execSQL("DELETE FROM metadata WHERE key != 'indexType'")
