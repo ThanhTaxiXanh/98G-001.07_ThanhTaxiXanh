@@ -297,7 +297,13 @@ class MainActivity : FlutterActivity() {
                         .enrich(parsed)
                     val coverage = vn.g98g00107.thanhtaxixanh.driver.car
                         .GpxOsmCoverageReview.inspectOffline(applicationContext, motion.fixes)
+                    val directed = vn.g98g00107.thanhtaxixanh.driver.car
+                        .GpxDirectedRoadReview.inspectOffline(applicationContext, motion.fixes)
                     val summary = mapOf(
+                        "directedMatched" to directed.matched,
+                        "directedMissing" to directed.missing,
+                        "directedAmbiguous" to directed.ambiguous,
+                        "directedDisconnected" to directed.disconnected,
                         "coverageCandidate" to coverage.candidatePoints,
                         "coverageMissing" to coverage.noRoadPoints,
                         "coverageOverloaded" to coverage.overloadedPoints,
