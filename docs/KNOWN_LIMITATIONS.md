@@ -8,3 +8,5 @@ M2: sự kiện cá nhân có CRUD lưu JSON trong SharedPreferences (`calendar_
 M2 OSM snapshot map: renderer is implemented but Android Auto host rendering is PENDING_DEVICE_TEST. Internet connection is required for uncached tiles; MapLibre tile cache is not an offline region. GPS needs permission on phone. Speed limit remains UNKNOWN until verified sign/OSM road matching is connected. CAR_EXACT_DASHBOARD_SUCCESS remains BLOCKED_BY_PLATFORM.
 
 M4 vẫn dùng GeoJSON giới hạn 8 MB và 50.000 đoạn; chỉ **khả năng truy vấn** dùng SQLite RTree, chưa có nhập dữ liệu Việt Nam quy mô lớn hoặc xác minh biển báo trên xe thật. Bộ kiểm thử SQLite chạy Robolectric chưa thay thế Android instrumentation.
+
+M4.2: nhận diện bản sao đoạn đường từ các tệp khác nhau nhưng không tự sửa mâu thuẫn maxspeed, không khử bản sao có sẵn từ dữ liệu cũ và không bảo đảm dữ liệu OSM đã kiểm chứng tại hiện trường.

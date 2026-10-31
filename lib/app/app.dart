@@ -353,14 +353,21 @@ class _SettingsHomeState extends State<SettingsHome> {
     ),
     if (locationError.isNotEmpty)
       Text(locationError, style: const TextStyle(color: Colors.orange)),
-    _section('Dữ liệu tốc độ OSM · SQLite RTree (M4)'),
+    _section('Dữ liệu tốc độ OSM · SQLite (M4.2)'),
     Text(roadStatus['available'] == true
         ? 'Đã nhập: ${roadStatus['segments']} / ${roadStatus['maximumSegments'] ?? 1000000} đoạn đường có maxspeed'
         : 'Chưa nhập dữ liệu đường. Tốc độ giới hạn hiển thị là --.'),
-    const Text('Dữ liệu đã lưu theo chỉ mục SQLite RTree để tra cứu gần GPS. '
+    if (roadStatus['available'] == true)
+      Text('Chỉ mục: ${roadStatus['storage'] ?? 'SQLite'}'
+          ' • Lần nhập thành công gần nhất: +${roadStatus['lastAdded'] ?? 0}'
+          ' đoạn, bỏ qua ${roadStatus['lastSkippedDuplicates'] ?? 0} đoạn trùng.'),
+    const Text('Dữ liệu lưu trong SQLite, ưu tiên RTree và tự dùng chỉ mục '
+        'B-tree nếu môi trường không hỗ trợ RTree. ' 
+        'Các đoạn có maxspeed xung đột được giữ riêng và có thể trả về chưa rõ. '
+        
         'Chọn GeoJSON FeatureCollection xuất từ OpenStreetMap hoặc '
         'Overpass Turbo, có đường LineString và thuộc tính maxspeed. '
-        'Bản đầu giới hạn 8 MB / 50.000 đoạn. Đây là dữ liệu cộng đồng '
+        'Mỗi tệp giới hạn 8 MB / 50.000 đoạn. Đây là dữ liệu cộng đồng '
         'tham khảo, không thay thế biển báo thực tế.'),
     const SizedBox(height: 8),
     FilledButton.icon(

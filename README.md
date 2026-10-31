@@ -1,6 +1,6 @@
 # THANHTAXIXANH SMART AUTO — V5
 
-**Mốc đang triển khai: M3 (prototype; debug APK và kiểm thử Flutter/JUnit).** Android Auto projection là đích hiển thị chính; điện thoại Android chỉ **Cài đặt + Xem trước thiết kế**. Không gọi preview trên điện thoại là dashboard thực tế trên xe.
+**Mốc đang triển khai: M4.2 (prototype; M4.1 CI/APK đã đạt, M4.2 đang kiểm thử).** Android Auto projection là đích hiển thị chính; điện thoại Android chỉ **Cài đặt + Xem trước thiết kế**. Không gọi preview trên điện thoại là dashboard thực tế trên xe.
 
 - Repo: ThanhTaxiXanh/98G-001.07_ThanhTaxiXanh
 - Kotlin namespace / Android applicationId: `vn.g98g00107.thanhtaxixanh.driver`
@@ -13,7 +13,7 @@
 
 ## Nhập dữ liệu tốc độ OSM bằng điện thoại Android
 
-Xem [hướng dẫn xuất GeoJSON trên điện thoại](docs/OSM_GEOJSON_PHONE_GUIDE.md). M3 chỉ nhập vùng nhỏ (8 MB / 50.000 đoạn), không có dữ liệu thì hiển thị --, không tạo biển báo giả.
+Xem [hướng dẫn xuất GeoJSON trên điện thoại](docs/OSM_GEOJSON_PHONE_GUIDE.md). M4.2 dùng SQLite RTree/B-tree, cho phép nhập nối tiếp tối đa 1.000.000 đoạn từ các tệp GeoJSON theo vùng (8 MB / 50.000 đoạn mỗi tệp); nhận diện đoạn trùng theo hình học và maxspeed, không xóa các giá trị tốc độ xung đột. Không có dữ liệu thì hiển thị --, không tạo biển báo giả.
 
 ## Build, test, APK
 

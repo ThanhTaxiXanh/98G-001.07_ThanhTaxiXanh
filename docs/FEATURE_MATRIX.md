@@ -18,3 +18,5 @@
 | Nhập OSM GeoJSON maxspeed vùng nhỏ | M3 UI/Storage | Native matcher + PIP / PENDING_CAR_TEST | NOT_TARGETED |
 
 | SQLite RTree spatial filtering | M4 native DB | M4 (PENDING_CAR_TEST) | NOT_TARGETED |
+
+| Khử trùng theo đoạn + chuyển DB v1→v2 | M4.2 native SQLite | M4.2 (CI_PENDING, CAR_PENDING) | NOT_TARGETED |

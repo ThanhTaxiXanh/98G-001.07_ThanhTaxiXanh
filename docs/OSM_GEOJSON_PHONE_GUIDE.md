@@ -46,3 +46,10 @@ Không phải bộ dữ liệu toàn quốc; cần cơ sở dữ liệu SQLite/R
 ## M4.1 — Nhập bổ sung nhiều khu vực
 
 Trên điện thoại, sau khi nhập vùng đầu tiên, bấm **Nhập bổ sung khu vực (giữ dữ liệu cũ)** để chọn thêm GeoJSON khác. Mỗi tệp vẫn tối đa 8 MB / 50.000 đoạn, còn tổng cơ sở SQLite M4.1 có giới hạn an toàn 1.000.000 đoạn. Nhập cùng một tệp giống hệt sẽ bị bỏ qua theo SHA-256; tuy nhiên hai tệp khác nhau vẫn có thể có đoạn đường trùng nhau nếu vùng xuất chồng lấn. Chức năng **Thay toàn bộ bằng tệp GeoJSON** xóa các đoạn đường trước đó trong cùng giao dịch SQLite và chỉ ghi tệp mới nếu hợp lệ. M4.1 không tự thu thập hoặc xác thực biển báo ngoài thực tế.
+
+## M4.2 — Khử trùng đoạn đường khi nhập nhiều vùng
+
+- Khi nhập GeoJSON mới, ứng dụng tính định danh SHA-256 theo hai đầu đoạn đường (làm tròn tọa độ 7 chữ số thập phân), giới hạn tốc độ theo chiều, oneway và tên đường. Nếu cùng đoạn và cùng thuộc tính đã tồn tại trong SQLite, không thêm một bản sao khác. Hai tệp GeoJSON khác nội dung nhưng có đoạn trùng cũng được lọc ở cấp đoạn.
+- Nếu **cùng hình học nhưng tốc độ hoặc hướng đi mâu thuẫn**, ứng dụng **giữ lại cả hai bản ghi** để ghép GPS có thể trả **Giới hạn: -- (chưa rõ)** thay vì áp đặt một tốc độ chưa kiểm chứng. Đây chưa phải hệ thống kiểm duyệt biển báo thực địa.
+- Trang Bản đồ hiển thị số đoạn mới ghi và số đoạn trùng bỏ qua ở lần nhập ghi thành công gần nhất. Những tệp có trùng một phần có thể ghi ít hơn số đoạn nguồn.
+- Cập nhật từ M4.1 lên M4.2 tự xây bảng định danh cho các đoạn cũ trong giao dịch nâng cấp SQLite, không xóa đường cũ. Các bản sao đã có từ trước được giữ nguyên trong lần nâng cấp; việc hợp nhất/xử lý xung đột của dữ liệu lịch sử sẽ được thực hiện ở giai đoạn tiếp theo.
