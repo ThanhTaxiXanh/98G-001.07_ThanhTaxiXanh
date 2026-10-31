@@ -63,9 +63,12 @@ class _LiveMapTileState extends State<LiveMapTile>
     if (!created || busy) return;
     busy = true;
     try {
+      final args = <String, dynamic>{'action': action};
+      if (enabled != null) {
+        args['enabled'] = enabled;
+      }
       final data = await channel.invokeMapMethod<String, dynamic>(
-        'phoneMapPreviewCommand',
-        <String, dynamic>{'action': action, if (enabled != null) 'enabled': enabled},
+        'phoneMapPreviewCommand', args,
       );
       if (mounted) {
         setState(() {
@@ -104,6 +107,15 @@ class _LiveMapTileState extends State<LiveMapTile>
     final heap = (status['javaHeapMb'] as num? ?? 0).toDouble();
     final nativeHeap = (status['nativeHeapMb'] as num? ?? 0).toDouble();
     final label = error ?? status['status'] as String? ?? 'MapLibre đang khởi tạo';
+    final telemetry = StringBuffer(gps && speed >= 0
+        ? 'GPS $speed km/h' : 'GPS --')
+      ..write(' • FPS gần đây ')
+      ..write(fps.toStringAsFixed(1))
+      ..write(' • Java ')
+      ..write(heap.toStringAsFixed(0))
+      ..write(' MB • Native ')
+      ..write(nativeHeap.toStringAsFixed(0))
+      ..write(' MB');
     return Stack(children: [
       Positioned.fill(
         child: AndroidView(
@@ -141,10 +153,7 @@ class _LiveMapTileState extends State<LiveMapTile>
             borderRadius: BorderRadius.circular(7)),
           child: Padding(padding: const EdgeInsets.all(6),
             child: Text(
-              (gps && speed >= 0 ? 'GPS $speed km/h' : 'GPS --') +
-              ' • FPS gần đây ' + fps.toStringAsFixed(1) +
-              ' • Java ' + heap.toStringAsFixed(0) + ' MB' +
-              ' • Native ' + nativeHeap.toStringAsFixed(0) + ' MB',
+              telemetry.toString(),
               maxLines: 2,
               style: const TextStyle(fontSize: 10, color: Colors.white)),
           )))),
