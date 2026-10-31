@@ -394,6 +394,7 @@ class MainActivity : FlutterActivity() {
                         "restrictionRelations" to directed.restrictionRelations,
                         "resolvedRestrictionRelations" to directed.resolvedRestrictionRelations,
                         "unresolvedRestrictionRelations" to directed.unresolvedRestrictionRelations,
+                        "restrictionCompatibility" to directed.restrictionCompatibility,
                         "coverageCandidate" to coverage.candidatePoints,
                         "coverageMissing" to coverage.noRoadPoints,
                         "coverageOverloaded" to coverage.overloadedPoints,
