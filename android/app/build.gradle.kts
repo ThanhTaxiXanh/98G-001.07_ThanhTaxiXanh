@@ -26,8 +26,8 @@ android {
     signingConfigs {
         create("releaseUpload") {
             val props = Properties()
-            val file = rootProject.file("key.properties")
-            if (file.exists()) file.inputStream().use { props.load(it) }
+            val keyPropsFile = rootProject.file("key.properties")
+            if (keyPropsFile.exists()) keyPropsFile.inputStream().use { props.load(it) }
             val keystorePath = props.getProperty("storeFile")
             if (keystorePath != null) {
                 storeFile = file(keystorePath)
