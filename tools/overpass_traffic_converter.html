@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ThanhTaxiXanh • Chuyển điểm OSM sang M5.1</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,Arial,sans-serif}
+body{max-width:720px;margin:0 auto;padding:18px;background:#0b1927;color:#eaf2f7;line-height:1.55}
+h1{font-size:1.45rem;color:#ffd36a}
+.card{border:1px solid #416078;border-radius:14px;padding:16px;margin:14px 0;background:#11293b}
+button{padding:13px 16px;border:0;border-radius:9px;background:#ffca4a;color:#151515;font-size:1rem;font-weight:700}
+button:disabled{opacity:.45}
+input[type=file]{width:100%;margin:12px 0}
+small{color:#b9ccd8}a{color:#97d7fa}
+.warn{color:#ffd36a}pre{white-space:pre-wrap;word-wrap:break-word;font-size:.85rem}
+</style>
+</head>
+<body>
+<h1>ThanhTaxiXanh • Chuyển GeoJSON biển báo OSM</h1>
+<p>Chạy trên trình duyệt, không gửi dữ liệu lên máy chủ. Tạo tệp ứng viên M5.1, <b>không phải biển báo đã xác minh</b> và không tự bật cảnh báo trên xe.</p>
+<div class="card">
+  <label><b>1. Chọn GeoJSON đã xuất từ Overpass Turbo</b>
+    <input type="file" id="file" accept=".geojson,.json,application/json">
+  </label>
+  <label><input type="checkbox" id="confirm">
+    Tôi xác nhận tệp này lấy từ <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap (ODbL)</a> và hiểu rằng dữ liệu chưa kiểm chứng.</label>
+  <p><button id="convert" disabled>2. Chuyển đổi và tải .geojson</button></p>
+  <p id="status" role="status">Chưa chọn tệp.</p>
+</div>
+<div class="card">
+<h2 style="font-size:1.1rem">Dữ liệu được hỗ trợ</h2>
+<p><code>traffic_sign=maxspeed</code> hoặc <code>traffic_sign=VN:P.127</code> <em>kèm</em> <code>maxspeed</code> bằng số; <code>highway=speed_camera</code>; <code>amenity=charging_station</code>; <code>amenity=fuel</code>; <code>highway=rest_area</code>; <code>barrier=toll_booth</code>; một số biển cấm mô tả rõ bằng tên.</p>
+<p class="warn">Không tự suy đoán biển từ ảnh, nội dung nhãn không rõ, mã Việt Nam chưa ánh xạ, điểm Way/Polygon hoặc nguồn không rõ. Không biến <code>direction</code> (hướng mặt biển) thành hướng di chuyển của xe.</p>
+<p>Giới hạn đầu vào 8 MB, đầu ra tối đa 5 MB / 10.000 điểm. Chỉ dùng sau khi xe đỗ an toàn.</p>
+</div>
+<details><summary>Xem cách xuất dữ liệu OSM</summary>
+<p>Mở <a href="https://overpass-turbo.eu/" target="_blank" rel="noopener">Overpass Turbo</a>, định vị khu vực nhỏ (2–5 km), chèn truy vấn rồi chọn Run → Export → GeoJSON. Truy vấn:</p>
+<pre>[out:json][timeout:50];
+(
+ node["traffic_sign"]({{bbox}});
+ node["highway"="speed_camera"]({{bbox}});
+ node["amenity"="charging_station"]({{bbox}});
+ node["amenity"="fuel"]({{bbox}});
+ node["highway"="rest_area"]({{bbox}});
+ node["barrier"="toll_booth"]({{bbox}});
+);
+out body;</pre>
+<p>Nếu có ít hoặc không có kết quả, đó là thiếu dữ liệu OSM tại khu vực, không có nghĩa thực địa không có biển.</p>
+</details>
+<script>
+'use strict';
+const file = document.getElementById('file');
+const confirm = document.getElementById('confirm');
+const button = document.getElementById('convert');
+const status = document.getElementById('status');
+function ready(){button.disabled = !file.files.length || !confirm.checked}
+file.addEventListener('change',ready);
+confirm.addEventListener('change',ready);
+const whitelist = new Set([
+ 'no_left_turn','no_right_turn','no_u_turn','no_entry',
+ 'no_overtaking','no_parking','urban_start','urban_end'
+]);
+function classify(p){
+ const raw = String(p.traffic_sign || '').toLowerCase();
+ const signs = raw.split(/[;,]/).map(s=>s.trim()).filter(Boolean);
+ const speedText = String(p.maxspeed || '');
+ const speed = /^\d+$/.test(speedText) ? Number(speedText) : NaN;
+ if ((signs.includes('maxspeed') || signs.includes('vn:p.127')) &&
+     Number.isInteger(speed) && speed>=5 && speed<=130 && speed%5===0)
+   return {kind:'speed_limit',speedKmh:speed};
+ if (p.highway === 'speed_camera') return {kind:'camera_speed'};
+ if (p.amenity === 'charging_station') return {kind:'charging_station'};
+ if (p.amenity === 'fuel') return {kind:'fuel_station'};
+ if (p.highway === 'rest_area') return {kind:'rest_area'};
+ if (p.barrier === 'toll_booth') return {kind:'toll_station'};
+ const exact = signs.find(s=>whitelist.has(s));
+ return exact ? {kind:exact} : null;
+}
+button.addEventListener('click',async()=>{
+  button.disabled=true;
+  try{
+    const input=file.files[0];
+    if(!input||input.size>8*1024*1024) throw Error('Tệp đầu vào vượt 8 MB');
+    const obj=JSON.parse(await input.text());
+    if(obj.type!=='FeatureCollection'||!Array.isArray(obj.features))
+      throw Error('Cần GeoJSON FeatureCollection từ Overpass Turbo');
+    if(obj.features.length>100000) throw Error('Quá nhiều features');
+    const out=[], used=new Set();
+    let skipped=0;
+    for(const f of obj.features){
+      const coords=f && f.geometry && f.geometry.coordinates;
+      if(!f || !f.geometry || f.geometry.type!=='Point' ||
+         !Array.isArray(coords)||coords.length!==2){skipped++;continue}
+      const [lon,lat]=coords.map(Number);
+      if(!Number.isFinite(lat)||!Number.isFinite(lon)||
+         lat<7||lat>24.5||lon<101||lon>116){skipped++;continue}
+      const p=f.properties && typeof f.properties==='object'
+        ? (f.properties.tags || f.properties) : {};
+      const match=classify(p);
+      if(!match){skipped++;continue}
+      const ref=String(p['@id'] || f.id || p.id || '').slice(0,100);
+      const key=[ref,lon.toFixed(6),lat.toFixed(6),match.kind,
+        match.speedKmh||''].join('|');
+      if(used.has(key)){skipped++;continue}
+      used.add(key);
+      const properties=Object.assign({},match,{
+        source:'OpenStreetMap',license:'ODbL-1.0',
+        sourceRef:ref?('OSM/'+ref):'OSM/user-export',
+        verification:'UNVERIFIED'
+      });
+      out.push({type:'Feature',geometry:{type:'Point',coordinates:[lon,lat]},
+        properties});
+      if(out.length>10000) throw Error('Vượt 10.000 điểm; thu nhỏ bbox');
+    }
+    if(!out.length)throw Error('Không tìm được điểm có tag rõ ràng trong tệp');
+    const result=JSON.stringify({type:'FeatureCollection',
+      name:'OSM_CANDIDATES_UNVERIFIED',features:out},null,2);
+    const blob=new Blob([result],{type:'application/geo+json'});
+    if(blob.size>5*1024*1024)throw Error('Đầu ra vượt 5 MB, thu nhỏ bbox');
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download='ThanhTaxiXanh_OSM_M5_1_UNVERIFIED.geojson';
+    document.body.append(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),10000);
+    status.textContent='Đã xuất '+out.length+' điểm ứng viên; bỏ qua '+
+      skipped+' feature không hỗ trợ/không đủ dữ liệu. Không phải bản cảnh báo đã kiểm chứng.';
+  }catch(e){status.textContent='Lỗi: '+(e && e.message ? e.message : 'Không xác định')}
+  finally{ready()}
+});
+</script>
+</body>
+</html>
