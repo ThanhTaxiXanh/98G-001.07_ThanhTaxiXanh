@@ -1,6 +1,9 @@
 package vn.g98g00107.thanhtaxixanh.driver
 
 import android.Manifest
+import android.app.Activity
+import android.net.Uri
+import kotlin.concurrent.thread
 import android.content.Intent
 import android.content.pm.PackageManager
 import io.flutter.embedding.android.FlutterActivity
@@ -9,6 +12,7 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private var pendingLocationPermission: MethodChannel.Result? = null
+    private var pendingRoadImport: MethodChannel.Result? = null
 
     private fun locationGranted(): Boolean =
         checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) ==
@@ -28,6 +32,37 @@ class MainActivity : FlutterActivity() {
                     result.success(null)
                 }
                 "getLocationPermission" -> result.success(locationGranted())
+                "getRoadDataStatus" -> result.success(OsmRoadStatus())
+                "importRoadGeoJson" -> {
+                    if (pendingRoadImport != null) {
+                        result.error("ALREADY_IMPORTING", "Đã có tệp đang được chọn", null)
+                    } else {
+                        pendingRoadImport = result
+                        try {
+                            val picker = Intent(Intent.ACTION_OPEN_DOCUMENT)
+                                .addCategory(Intent.CATEGORY_OPENABLE)
+                                .setType("*/*")
+                                .putExtra(Intent.EXTRA_MIME_TYPES, arrayOf(
+                                    "application/geo+json",
+                                    "application/json",
+                                    "text/plain",
+                                    "application/octet-stream"
+                                ))
+                            startActivityForResult(picker, ROAD_IMPORT_REQUEST)
+                        } catch (e: Exception) {
+                            pendingRoadImport = null
+                            result.error("PICKER_UNAVAILABLE", e.message, null)
+                        }
+                    }
+                }
+                "clearRoadGeoJson" -> {
+                    try {
+                        vn.g98g00107.thanhtaxixanh.driver.car.OsmRoadCatalog.clear(this)
+                        result.success(OsmRoadStatus())
+                    } catch (e: Exception) {
+                        result.error("DELETE_FAILED", e.message, null)
+                    }
+                }
                 "requestLocationPermission" -> {
                     when {
                         locationGranted() -> result.success(true)
@@ -43,6 +78,34 @@ class MainActivity : FlutterActivity() {
                     }
                 }
                 else -> result.notImplemented()
+            }
+        }
+    }
+
+    private fun OsmRoadStatus(): Map<String, Any> =
+        vn.g98g00107.thanhtaxixanh.driver.car.OsmRoadCatalog.status(this)
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != ROAD_IMPORT_REQUEST) return
+        val pending = pendingRoadImport ?: return
+        pendingRoadImport = null
+        val uri: Uri? = if (resultCode == Activity.RESULT_OK) data?.data else null
+        if (uri == null) {
+            pending.success(null) // User canceled. Keep existing imported data.
+            return
+        }
+        thread(name = "OsmRoadGeoJsonImport") {
+            try {
+                vn.g98g00107.thanhtaxixanh.driver.car.OsmRoadCatalog
+                    .import(this, uri)
+                runOnUiThread {
+                    pending.success(OsmRoadStatus())
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    pending.error("INVALID_GEOJSON", e.message ?: "Dữ liệu không hợp lệ", null)
+                }
             }
         }
     }
@@ -70,5 +133,6 @@ class MainActivity : FlutterActivity() {
         const val ACTION_CONFIG_CHANGED =
             "vn.g98g00107.thanhtaxixanh.driver.CONFIG_CHANGED"
         private const val LOCATION_PERMISSION_CODE = 4281
+        private const val ROAD_IMPORT_REQUEST = 4282
     }
 }

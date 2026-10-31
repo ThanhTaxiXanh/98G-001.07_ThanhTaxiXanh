@@ -5,3 +5,15 @@ Nguồn được kiểm tra 2026-10-31: https://chinhphu.vn/?classid=1&docid=211
 Xe con thông thường ngoài đường cao tốc: trong khu dân cư đường không dải phân cách = 50, đường đôi hoặc một chiều từ 2 làn xe cơ giới = 60; ngoài khu dân cư tương ứng 80/90. Tham chiếu Điều 6. Quy tắc chỉ ước tính khi có nguồn xác minh vùng pháp lý và hình thái đường. OSM road=urban, xây dựng dày, lanes=4 KHÔNG đủ để chứng minh dân cư hay dải phân cách. Cao tốc/xe khác/thiếu thông tin => UNKNOWN.
 
 Mã `lib/features/speed_rules/speed_rules.dart`; 13 kiểm thử gồm phân cách, một chiều, cao tốc, biển được xác minh, OSM, thiếu dữ kiện. Đầu ra `≈50` và `SpeedSource.legalDefaultEstimate`, không phải biển chính thức. Không được khẳng định tài xế được chạy ở tốc độ ước tính.
+
+
+## M3 — Nhập OSM maxspeed GeoJSON trên điện thoại Android
+
+- Phone Settings > Bản đồ > Nhập GeoJSON từ điện thoại. Picker dùng ACTION_OPEN_DOCUMENT, KHÔNG cần root, quyền quản trị tệp hoặc máy tính.
+- Chỉ chấp nhận chuẩn GeoJSON FeatureCollection có geometry LineString hoặc MultiLineString và properties chứa maxspeed, maxspeed:forward, maxspeed:backward theo đơn vị km/h; các giá trị "signals", "walk", "VN:urban", mph, điều kiện theo giờ/thời tiết bị bỏ qua để tránh hiểu sai.
+- Tệp được giới hạn 8 MB / 50.000 segment: dùng cho từng khu vực nhỏ, không phải cơ sở dữ liệu tốc độ toàn quốc. Nhập dữ liệu sai/tệp quá lớn không làm mất cơ sở hiện hành.
+- Engine gần GPS dùng khoảng cách đến segment, hướng di chuyển, one-way, sai số vị trí <=18 m và kiểm tra mâu thuẫn giữa đường song song. Nếu thiếu hướng cho maxspeed theo hướng hoặc nhiều đường có speed khác nhau trong sai số: trả UNKNOWN.
+- Mọi speed hiển thị dạng **OSM: X km/h (tham khảo)**, KHÔNG là giới hạn biển báo đã xác minh. Xe phải tuân thủ biển báo và quy định tại thực địa; dữ liệu có thể cũ.
+- Xuất vùng dữ liệu phù hợp từ https://overpass-turbo.eu (OSM tags highway và maxspeed). Giữ nguyên tọa độ WGS84 [lon, lat]. Không nhập ảnh/dataset YOLO biển báo như tọa độ.
+- Import đọc file và xác thực nội dung trên luồng nền. Car map tải snapshot khi khởi động; sau cập nhật hãy ngắt/kết nối lại Android Auto.
+- CI kiểm thử matcher bản địa bằng Gradle JUnit. Chưa đo hiệu năng trên xe; M3 này không đáp ứng bài toán đầy đủ đường/camera/biển báo Việt Nam.

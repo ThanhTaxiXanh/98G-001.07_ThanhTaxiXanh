@@ -12,6 +12,9 @@ import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Looper
+import android.os.Handler
+import java.util.concurrent.Executors
+import java.util.concurrent.ExecutorService
 import android.util.Log
 import android.view.Surface
 import androidx.car.app.SurfaceCallback
@@ -45,6 +48,13 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
     private var lastFixAt = 0L
     private var speedKmh: Int? = null
     private var error: String? = null
+    private var roads: List<OsmRoadSegment> = emptyList()
+    private var roadMatch: OsmSpeedMatch? = null
+    private var worker: ExecutorService? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var matchSequence = 0
+    private var roadDataError: String? = null
+
 
     private val locationListener = object : LocationListener {
         override fun onLocationChanged(location: Location) {
@@ -59,6 +69,7 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
             speedKmh = if (location.hasSpeed()) {
                 (location.speed * 3.6f).toInt().coerceAtLeast(0)
             } else null
+            matchRoadSpeed(location)
             requestMap()
         }
     }
@@ -96,6 +107,11 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
         rendering = false
         dirty = false
         lastMap = null
+        worker?.shutdownNow()
+        worker = Executors.newSingleThreadExecutor()
+        roads = emptyList()
+        roadMatch = null
+        roadDataError = null
         targetSurface = container.surface
         width = container.width
         height = container.height
@@ -110,11 +126,57 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
                     .withCameraPosition(camera()))
             error = null
             beginLocation()
+            loadRoadData()
             requestMap()
         } catch (e: Exception) {
             error = "Không thể khởi tạo bản đồ OSM"
             Log.e(tag, "MapLibre initialization failed", e)
             drawFrame()
+        }
+    }
+
+    private fun loadRoadData() {
+        val queue = worker ?: return
+        val version = generation
+        queue.execute {
+            val parsed = runCatching { OsmRoadCatalog.load(context) }
+            mainHandler.post {
+                if (version == generation) {
+                    roads = parsed.getOrNull()?.roads ?: emptyList()
+                    roadDataError = parsed.exceptionOrNull()?.message
+                    Log.i(tag, "Imported OSM speed segments: " + roads.size)
+                    drawFrame()
+                }
+            }
+        }
+    }
+
+    private fun matchRoadSpeed(location: Location) {
+        roadMatch = null
+        val dataset = roads
+        val queue = worker ?: return
+        if (dataset.isEmpty()) return
+        val accuracy = if (location.hasAccuracy()) location.accuracy.toDouble()
+            else Double.POSITIVE_INFINITY
+        val bearing = if (location.hasBearing() &&
+            (!location.hasBearingAccuracy() ||
+                location.bearingAccuracyDegrees <= 40f)) {
+            location.bearing.toDouble()
+        } else null
+        val speed = if (location.hasSpeed()) location.speed.toDouble() else 0.0
+        val lat = location.latitude
+        val lon = location.longitude
+        val request = ++matchSequence
+        val version = generation
+        queue.execute {
+            val matched = OsmRoadMatcher.match(
+                dataset, lat, lon, accuracy, bearing, speed)
+            mainHandler.post {
+                if (version == generation && request == matchSequence) {
+                    roadMatch = matched
+                    drawFrame()
+                }
+            }
         }
     }
 
@@ -201,15 +263,20 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
             val y = area.top + 12f
             canvas.drawRoundRect(x, y, x + minOf(area.width() - 24f, 360f * scale),
                 y + 98f * scale, 12f, 12f, bg)
-            canvas.drawText("GPS " + (speedKmh?.toString() ?: "--") + " km/h",
+            val fresh = hasFix && System.currentTimeMillis() - lastFixAt <= 15_000L
+            canvas.drawText("GPS " + ((if (fresh) speedKmh?.toString() else null) ?: "--") + " km/h",
                 x + 9f, y + 28f * scale, label)
-            canvas.drawText("Giới hạn: -- (chưa kiểm chứng)",
+            val textLimit = if (fresh && roadMatch != null) "OSM: " + roadMatch!!.kmh + " km/h (tham khảo)"
+                else "Giới hạn: -- (chưa rõ)"
+            canvas.drawText(textLimit,
                 x + 9f, y + 55f * scale, secondary)
             val status = when {
                 !locationGranted() -> "Cần cấp quyền GPS trên điện thoại"
                 !hasFix -> "Đang chờ vị trí GPS"
                 System.currentTimeMillis() - lastFixAt > 120_000L -> "GPS đã cũ"
-                else -> "OSM / OpenFreeMap"
+                roadDataError != null -> "Dữ liệu đường bị lỗi"
+                roads.isEmpty() -> "Chưa nhập dữ liệu maxspeed"
+                else -> "OSM maxspeed: " + roads.size + " đoạn"
             }
             canvas.drawText(status, x + 9f, y + 80f * scale, secondary)
             if (lastMap == null || error != null) {
@@ -247,6 +314,9 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
 
     fun stop() {
         generation++
+        matchSequence++
+        worker?.shutdownNow()
+        worker = null
         try { locationManager.removeUpdates(locationListener) }
         catch (_: Exception) {}
         snapshotter?.cancel()

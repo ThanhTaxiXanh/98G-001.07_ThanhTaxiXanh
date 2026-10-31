@@ -62,6 +62,9 @@ class _SettingsHomeState extends State<SettingsHome> {
   static const locationChannel = MethodChannel('vn.g98g00107.thanhtaxixanh.driver/config');
   bool? locationGranted;
   String locationError = '';
+  Map<String, dynamic> roadStatus = {};
+  String roadError = '';
+  bool roadBusy = false;
   final eventStore = CalendarEventStore();
   bool eventLunar = false;
   bool eventLeap = false;
@@ -74,6 +77,7 @@ class _SettingsHomeState extends State<SettingsHome> {
     super.initState();
     unawaited(_loadFields());
     unawaited(_checkLocationPermission());
+    unawaited(_readRoadStatus());
     unawaited(eventStore.load());
   }
   Future<void> _loadFields() async {
@@ -123,6 +127,85 @@ class _SettingsHomeState extends State<SettingsHome> {
     } on PlatformException catch (e) {
       if (mounted) {
         setState(() => locationError = e.message ?? 'Yêu cầu GPS không thành công');
+      }
+    }
+  }
+
+  Future<void> _readRoadStatus() async {
+    try {
+      final status = await locationChannel.invokeMapMethod<String, dynamic>(
+        'getRoadDataStatus');
+      if (mounted) {
+        setState(() => roadStatus = Map<String, dynamic>.from(status ?? {}));
+      }
+    } on MissingPluginException {
+      // Android-only API: widget tests do not need an Android document picker.
+    } on PlatformException catch (e) {
+      if (mounted) {
+        setState(() => roadError = e.message ?? 'Không đọc được dữ liệu đường');
+      }
+    }
+  }
+
+  Future<void> _importRoadGeoJson() async {
+    if (roadBusy) {
+      return;
+    }
+    setState(() {
+      roadBusy = true;
+      roadError = '';
+    });
+    try {
+      final status = await locationChannel.invokeMapMethod<String, dynamic>(
+        'importRoadGeoJson');
+      if (mounted && status != null) {
+        setState(() => roadStatus = Map<String, dynamic>.from(status));
+      }
+    } on MissingPluginException {
+      if (mounted) {
+        setState(() => roadError = 'Chỉ nhập tệp trên điện thoại Android.');
+      }
+    } on PlatformException catch (e) {
+      if (mounted) {
+        setState(() => roadError = e.message ?? 'Không thể nhập GeoJSON');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => roadBusy = false);
+      }
+    }
+  }
+
+  Future<void> _deleteRoadGeoJson() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xóa dữ liệu đường OSM đã nhập?'),
+        content: const Text('Dữ liệu đường ngoại tuyến sẽ bị xóa khỏi ứng dụng. '
+            'Không ảnh hưởng đến sự kiện hoặc tài khoản ngân hàng.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false),
+              child: const Text('Hủy')),
+          FilledButton(onPressed: () => Navigator.pop(context, true),
+              child: const Text('Xóa dữ liệu')),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) {
+      return;
+    }
+    try {
+      final status = await locationChannel.invokeMapMethod<String, dynamic>(
+        'clearRoadGeoJson');
+      if (mounted) {
+        setState(() {
+          roadStatus = Map<String, dynamic>.from(status ?? {});
+          roadError = '';
+        });
+      }
+    } on PlatformException catch (e) {
+      if (mounted) {
+        setState(() => roadError = e.message ?? 'Xóa dữ liệu thất bại');
       }
     }
   }
@@ -270,6 +353,29 @@ class _SettingsHomeState extends State<SettingsHome> {
     ),
     if (locationError.isNotEmpty)
       Text(locationError, style: const TextStyle(color: Colors.orange)),
+    _section('Dữ liệu tốc độ OSM ngoại tuyến'),
+    Text(roadStatus['available'] == true
+        ? 'Đã nhập: ${roadStatus['segments']} đoạn đường có maxspeed'
+        : 'Chưa nhập dữ liệu đường. Tốc độ giới hạn hiển thị là --.'),
+    const Text('Chọn GeoJSON FeatureCollection xuất từ OpenStreetMap hoặc '
+        'Overpass Turbo, có đường LineString và thuộc tính maxspeed. '
+        'Bản đầu giới hạn 8 MB / 50.000 đoạn. Đây là dữ liệu cộng đồng '
+        'tham khảo, không thay thế biển báo thực tế.'),
+    const SizedBox(height: 8),
+    FilledButton.icon(
+      onPressed: roadBusy ? null : () => unawaited(_importRoadGeoJson()),
+      icon: const Icon(Icons.file_open),
+      label: Text(roadBusy ? 'Đang nhập dữ liệu…' : 'Nhập GeoJSON từ điện thoại'),
+    ),
+    if (roadStatus['available'] == true)
+      TextButton.icon(
+        onPressed: roadBusy ? null : () => unawaited(_deleteRoadGeoJson()),
+        icon: const Icon(Icons.delete_outline),
+        label: const Text('Xóa dữ liệu maxspeed đã nhập'),
+      ),
+    if (roadError.isNotEmpty)
+      Text(roadError, style: const TextStyle(color: Colors.orange)),
+    const Text('Ngắt và kết nối lại Android Auto sau khi thay dữ liệu đường.'),
 
     SwitchListTile(
       title: const Text('Bản đồ 3D'),
