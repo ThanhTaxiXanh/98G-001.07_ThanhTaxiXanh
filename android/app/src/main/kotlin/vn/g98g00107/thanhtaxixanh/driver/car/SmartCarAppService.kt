@@ -12,6 +12,8 @@ import androidx.car.app.navigation.model.NavigationTemplate
 import androidx.car.app.model.Template
 import androidx.car.app.validation.HostValidator
 import android.content.pm.ApplicationInfo
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 
 /**
  * Android Auto projection entry point. No arbitrary Flutter widgets on AA.
@@ -34,7 +36,7 @@ private class SmartSession : Session() {
         mapSurface = CarOsmMapSurface(carContext)
         carContext.getCarService(AppManager::class.java)
             .setSurfaceCallback(mapSurface)
-        return object : Screen(carContext) {
+        val screen = object : Screen(carContext) {
             override fun onGetTemplate(): Template =
                 NavigationTemplate.Builder()
                     .setActionStrip(
@@ -57,5 +59,18 @@ private class SmartSession : Session() {
                     )
                     .build()
         }
+        screen.lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onDestroy(owner: LifecycleOwner) {
+                // Some hosts do not deliver SurfaceDestroyed on every exit.
+                mapSurface.stop()
+                CarSurfaceTelemetry.record(carContext, "sessionStopped", 0, 0,
+                    null, null)
+                runCatching {
+                    carContext.getCarService(AppManager::class.java)
+                        .setSurfaceCallback(null)
+                }.onFailure { Log.w("ThanhTaxiCar", "Clear host callback failed", it) }
+            }
+        })
+        return screen
     }
 }
