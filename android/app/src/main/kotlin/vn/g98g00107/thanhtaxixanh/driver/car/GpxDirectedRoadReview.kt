@@ -35,8 +35,8 @@ object GpxDirectedRoadReview {
     fun inspect(
         fixes: List<GpsTraceRoadReview.Fix>,
         graph: OsmTopologyGraphBuilder.Build,
-        candidates: (GpsTraceRoadReview.Fix) -> List<Road>?,
-        restrictions: Set<DirectedRoadGraph.TurnRestriction> = emptySet()
+        restrictions: Set<DirectedRoadGraph.TurnRestriction> = emptySet(),
+        candidates: (GpsTraceRoadReview.Fix) -> List<Road>?
     ): Report {
         require(fixes.size <= 5000)
         val byRoad = graph.edges.groupBy { it.id.substringBefore(':') }
