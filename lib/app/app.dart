@@ -216,7 +216,9 @@ class _SettingsHomeState extends State<SettingsHome> {
         ],
       ),
     );
-    if (confirm != true || !mounted) return;
+    if (confirm != true || !mounted) {
+      return;
+    }
     setState(() {
       roadBusy = true;
       roadError = '';
@@ -231,13 +233,17 @@ class _SettingsHomeState extends State<SettingsHome> {
         });
       }
     } on MissingPluginException {
-      if (mounted) setState(() =>
-          roadError = 'Chỉ hỗ trợ nhập topology trên Android.');
+      if (mounted) {
+        setState(() => roadError = 'Chỉ hỗ trợ nhập topology trên Android.');
+      }
     } on PlatformException catch (e) {
-      if (mounted) setState(() =>
-          roadError = e.message ?? 'Tệp topology không hợp lệ');
+      if (mounted) {
+        setState(() => roadError = e.message ?? 'Tệp topology không hợp lệ');
+      }
     } finally {
-      if (mounted) setState(() => roadBusy = false);
+      if (mounted) {
+        setState(() => roadBusy = false);
+      }
     }
   }
 
