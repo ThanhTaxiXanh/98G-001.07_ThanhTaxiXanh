@@ -40,10 +40,10 @@ class CarLayoutConfig {
     schemaVersion: schemaVersion,
     targetWidthPx: targetWidthPx ?? this.targetWidthPx,
     targetHeightPx: targetHeightPx ?? this.targetHeightPx,
-    columnRatio: (columnRatio ?? this.columnRatio).clamp(0.50, 0.70),
-    calendarWeight: (calendarWeight ?? this.calendarWeight).clamp(0.10, 0.75),
-    qrWeight: (qrWeight ?? this.qrWeight).clamp(0.10, 0.75),
-    mediaWeight: (mediaWeight ?? this.mediaWeight).clamp(0.10, 0.75),
+    columnRatio: (columnRatio ?? this.columnRatio).clamp(0.50, 0.70).toDouble(),
+    calendarWeight: (calendarWeight ?? this.calendarWeight).clamp(0.10, 0.75).toDouble(),
+    qrWeight: (qrWeight ?? this.qrWeight).clamp(0.10, 0.75).toDouble(),
+    mediaWeight: (mediaWeight ?? this.mediaWeight).clamp(0.10, 0.75).toDouble(),
     nightMode: nightMode ?? this.nightMode,
     showSpeedEstimates: showSpeedEstimates ?? this.showSpeedEstimates,
     signWarningMeters: signWarningMeters ?? this.signWarningMeters,
@@ -71,15 +71,15 @@ class CarLayoutConfig {
         (m[key] as num?)?.toDouble() ?? fallback;
     bool boolean(String key, bool fallback) => m[key] as bool? ?? fallback;
     return CarLayoutConfig(
-      targetWidthPx: integer('targetWidthPx', 934).clamp(240, 7680),
-      targetHeightPx: integer('targetHeightPx', 844).clamp(240, 7680),
-      columnRatio: decimal('columnRatio', 0.60).clamp(0.50, 0.70),
-      calendarWeight: decimal('calendarWeight', 0.25).clamp(0.10, 0.75),
-      qrWeight: decimal('qrWeight', 0.45).clamp(0.10, 0.75),
-      mediaWeight: decimal('mediaWeight', 0.30).clamp(0.10, 0.75),
+      targetWidthPx: integer('targetWidthPx', 934).clamp(240, 7680).toInt(),
+      targetHeightPx: integer('targetHeightPx', 844).clamp(240, 7680).toInt(),
+      columnRatio: decimal('columnRatio', 0.60).clamp(0.50, 0.70).toDouble(),
+      calendarWeight: decimal('calendarWeight', 0.25).clamp(0.10, 0.75).toDouble(),
+      qrWeight: decimal('qrWeight', 0.45).clamp(0.10, 0.75).toDouble(),
+      mediaWeight: decimal('mediaWeight', 0.30).clamp(0.10, 0.75).toDouble(),
       nightMode: boolean('nightMode', true),
       showSpeedEstimates: boolean('showSpeedEstimates', true),
-      signWarningMeters: integer('signWarningMeters', 500).clamp(100, 2000),
+      signWarningMeters: integer('signWarningMeters', 500).clamp(100, 2000).toInt(),
       map3d: boolean('map3d', true),
     );
   }

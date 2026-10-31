@@ -9,7 +9,7 @@ import androidx.car.app.Session
 import androidx.car.app.navigation.model.NavigationTemplate
 import androidx.car.app.model.Template
 import androidx.car.app.validation.HostValidator
-import vn.g98g00107.thanhtaxixanh.driver.BuildConfig
+import android.content.pm.ApplicationInfo
 
 /**
  * Android Auto projection entry point. No arbitrary Flutter widgets on AA.
@@ -17,7 +17,7 @@ import vn.g98g00107.thanhtaxixanh.driver.BuildConfig
  */
 class SmartCarAppService : CarAppService() {
     override fun createHostValidator(): HostValidator =
-        if (BuildConfig.DEBUG) HostValidator.ALLOW_ALL_HOSTS_VALIDATOR
+        if ((applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0) HostValidator.ALLOW_ALL_HOSTS_VALIDATOR
         else HostValidator.Builder(this)
             .addAllowedHosts(androidx.car.app.R.array.hosts_allowlist_sample)
             .build()

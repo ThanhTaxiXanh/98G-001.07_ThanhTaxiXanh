@@ -22,7 +22,6 @@ class CarPreview extends StatelessWidget {
           aspectRatio: config.targetWidthPx / config.targetHeightPx,
           child: LayoutBuilder(builder: (context, constraints) {
             // All content shrinks within the preview canvas.
-            final scale = constraints.maxWidth / config.targetWidthPx;
             return ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: FittedBox(

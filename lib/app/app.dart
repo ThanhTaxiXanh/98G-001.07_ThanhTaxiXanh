@@ -199,7 +199,7 @@ class _SettingsHomeState extends State<SettingsHome> {
     children: [
       Text('$label: ${(value * 100).toStringAsFixed(0)}'),
       Slider(
-        value: value.clamp(min, max), min: min, max: max,
+        value: value.clamp(min, max).toDouble(), min: min, max: max,
         divisions: 20,
         label: (value * 100).round().toString(),
         onChanged: (next) => unawaited(widget.store.update(build(next))),
