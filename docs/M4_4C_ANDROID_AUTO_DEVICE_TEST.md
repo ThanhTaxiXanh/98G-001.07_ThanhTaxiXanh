@@ -14,7 +14,7 @@
 
 1. Chỉ thực hiện khi **xe đang đỗ an toàn**. Tải APK từ GitHub Actions của commit M4.4C sau khi trạng thái CI SUCCESS, cài trên điện thoại Android và bảo đảm quyền truy cập vị trí nếu cần bản đồ GPS. Không cần root.
 2. Kết nối Android Auto như bình thường. Mở ứng dụng ThanhTaxiXanh trên xe (nếu được host cho phép). Chụp ảnh màn hình xe khi bản đồ hiển thị toàn màn hình hoặc chia đôi; ghi lại phần nút zoom/GPS có nhìn rõ hay không.
-3. Trên điện thoại mở ThanhTaxiXanh → **Bản đồ** → **Đọc trạng thái Surface**. Xem Surface Width × Height, Visible Area, Stable Area, Safe Area và sự kiện gần nhất. Nếu chưa có sự kiện, ghi nhận đúng là `Chưa ghi nhận`, không tự suy ra kích thước từ màn hình xe.
+3. Trên điện thoại mở ThanhTaxiXanh → **Bản đồ** → **Đọc trạng thái Surface**. Xem Surface Width × Height, DPI, tỷ lệ rộng/cao, Visible Area, Stable Area, Safe Area và sự kiện gần nhất. Nếu chưa có sự kiện, ghi nhận đúng là `Chưa ghi nhận`, không tự suy ra kích thước từ màn hình xe.
 4. Khi xe vẫn đỗ, chuyển qua các chế độ màn hình host hỗ trợ (toàn màn hình, chia đôi, launcher), mở lại bảng chẩn đoán rồi bấm **Đọc trạng thái Surface**. Nếu visible/stable không thay đổi dù UI đổi, ghi nhận hạn chế host và gửi ảnh; không coi inset đã cũ là đúng.
 5. Thử **Phóng to / Thu nhỏ** trong action strip và thao tác chụm phóng to trực tiếp trên host nếu host cho phép. Kiểm tra mục `Cử chỉ do host chuyển tiếp`. Chưa có điều khiển scroll/fling trong bản này.
 6. Ngắt kết nối Android Auto, kết nối lại, rồi xem số lần Surface tạo/hủy và log. Nếu host không gửi destroy, Lifecycle Screen vẫn phải đóng map; quan sát kết quả thay vì kết luận trước.
@@ -23,6 +23,7 @@
 ## Cách đọc trạng thái
 
 - `surfaceWidth`, `surfaceHeight`: kích thước pixel do Android Auto cung cấp, không nhất thiết bằng độ phân giải vật lý của màn VF e34.
+- `surfaceDpi` và `surfaceAspectRatio`: giá trị từ chính SurfaceContainer của host, không lấy từ cấu hình màn hình điện thoại. Kích thước Surface cuối cùng được giữ lại trong báo cáo ngay cả khi Screen đã dừng.
 - `visible`: vùng host hiện báo đang nhìn thấy. `stable`: vùng host báo ít bị UI động che phủ. `safe`: phần giao hợp lệ, dùng để đặt thông tin tốc độ.
 - `overlaySafe`: true nghĩa tính toán dựa trên inset đã biết hợp lệ; **không đảm bảo** host không có lỗi cập nhật inset.
 - `lastObservedAt`, `lastEvent`: thời điểm và sự kiện cuối. `lastObservedSurfaceActive` là trạng thái callback đã lưu, **không** phải chứng thực kết nối hiện thời.
