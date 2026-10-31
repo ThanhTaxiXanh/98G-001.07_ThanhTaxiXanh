@@ -7,8 +7,9 @@
 | VietQR offline payload/CRC | IMPLEMENTED/TEST_PENDING | NOT_IMPLEMENTED | NOT_IMPLEMENTED |
 | Speed rule baseline | UNIT_CODE | NOT_CONNECTED_TO_MAP | NOT_CONNECTED_TO_MAP |
 | CarAppService navigation template | N/A | IMPLEMENTED/PENDING_DEVICE_TEST | NOT_TARGETED |
-| Host map surface diagnostic | N/A | IMPLEMENTED/PENDING_DEVICE_TEST | NOT_TARGETED |
-| Bản đồ OSM MapLibre + routing | NOT_IMPLEMENTED | NOT_IMPLEMENTED | NOT_IMPLEMENTED |
+| Host map surface renderer | N/A | MapLibre OSM snapshot / PENDING_DEVICE_TEST | NOT_TARGETED |
+| Bản đồ OSM MapLibre | NOT_IMPLEMENTED | M2 CODE / PENDING_CAR_TEST (online snapshot) | NOT_TARGETED |
+| OSM routing | NOT_IMPLEMENTED | NOT_IMPLEMENTED | NOT_IMPLEMENTED |
 | QR + Lịch + Media đồng thời trong car | Preview mô phỏng | BLOCKED_BY_PLATFORM | UNVERIFIED |
 | Lunar calendar + event recurrence | NOT_IMPLEMENTED | NOT_IMPLEMENTED | NOT_IMPLEMENTED |
 | Audio MediaLibraryService | NOT_IMPLEMENTED | NOT_IMPLEMENTED | NOT_IMPLEMENTED |

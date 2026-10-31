@@ -28,10 +28,12 @@ class SmartCarAppService : CarAppService() {
 }
 
 private class SmartSession : Session() {
+    private lateinit var mapSurface: CarOsmMapSurface
     override fun onCreateScreen(intent: Intent): Screen {
-        Log.i("ThanhTaxiCar", "AA session created; actual dashboard still unverified")
+        Log.i("ThanhTaxiCar", "AA session created; OSM surface awaits host")
+        mapSurface = CarOsmMapSurface(carContext)
         carContext.getCarService(AppManager::class.java)
-            .setSurfaceCallback(CarDiagnosticSurface())
+            .setSurfaceCallback(mapSurface)
         return object : Screen(carContext) {
             override fun onGetTemplate(): Template =
                 NavigationTemplate.Builder()
@@ -39,10 +41,16 @@ private class SmartSession : Session() {
                         ActionStrip.Builder()
                             .addAction(
                                 Action.Builder()
-                                    .setTitle("Kiểm tra")
+                                    .setTitle("Phóng to")
                                     .setOnClickListener {
-                                        Log.i("ThanhTaxiCar", "Diagnostic host action tapped")
+                                        mapSurface.zoomBy(1.0)
                                     }
+                                    .build()
+                            )
+                            .addAction(
+                                Action.Builder()
+                                    .setTitle("Thu nhỏ")
+                                    .setOnClickListener { mapSurface.zoomBy(-1.0) }
                                     .build()
                             )
                             .build()
