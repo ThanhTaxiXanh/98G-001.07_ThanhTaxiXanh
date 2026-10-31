@@ -71,6 +71,7 @@ class _SettingsHomeState extends State<SettingsHome> {
   String locationError = '';
   Map<String, dynamic> roadStatus = {};
   Map<String, dynamic>? roadQuality;
+  Map<String, dynamic>? gpxReview;
   String roadError = '';
   bool roadBusy = false;
   final eventStore = CalendarEventStore();
@@ -239,6 +240,35 @@ class _SettingsHomeState extends State<SettingsHome> {
     } on PlatformException catch (e) {
       if (mounted) {
         setState(() => roadError = e.message ?? 'Tệp topology không hợp lệ');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => roadBusy = false);
+      }
+    }
+  }
+
+  Future<void> _reviewGpxTrack() async {
+    if (roadBusy) {
+      return;
+    }
+    setState(() {
+      roadBusy = true;
+      roadError = '';
+    });
+    try {
+      final summary = await locationChannel.invokeMapMethod<String, dynamic>(
+        'reviewGpxTrack');
+      if (mounted && summary != null) {
+        setState(() => gpxReview = Map<String, dynamic>.from(summary));
+      }
+    } on MissingPluginException {
+      if (mounted) {
+        setState(() => roadError = 'Chỉ hỗ trợ đọc GPX trên Android.');
+      }
+    } on PlatformException catch (e) {
+      if (mounted) {
+        setState(() => roadError = e.message ?? 'GPX không hợp lệ');
       }
     } finally {
       if (mounted) {
@@ -608,6 +638,17 @@ class _SettingsHomeState extends State<SettingsHome> {
       icon: const Icon(Icons.account_tree_outlined),
       label: const Text('Nhập GeoJSON có OSM Node ID (thay toàn bộ)'),
     ),
+    OutlinedButton.icon(
+      onPressed: roadBusy ? null : () => unawaited(_reviewGpxTrack()),
+      icon: const Icon(Icons.route_outlined),
+      label: const Text('Phân tích tệp GPX ngoại tuyến'),
+    ),
+    if (gpxReview != null)
+      Text('GPX: ${gpxReview!['points']} điểm hợp lệ · '
+          '${gpxReview!['rejected']} điểm loại · '
+          '${gpxReview!['headings']} hướng suy ra · '
+          '${gpxReview!['uncertain']} điểm chưa chắc chắn. '
+          'Chỉ phân tích, chưa xác nhận đoạn đường.'),
     if (roadStatus['available'] == true)
       OutlinedButton.icon(
         onPressed: roadBusy ? null
