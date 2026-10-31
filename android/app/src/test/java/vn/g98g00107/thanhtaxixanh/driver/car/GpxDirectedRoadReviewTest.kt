@@ -15,7 +15,7 @@ class GpxDirectedRoadReviewTest {
         GpxDirectedRoadReview.Road(id,lat - 0.001,106.0,lat + 0.001,106.0)
 
     @Test fun connectedRoadsAreReviewOnly() {
-        val fixes = listOf(fix(21.0,1000),fix(21.01,2000))
+        val fixes = listOf(fix(21.0,1000),fix(21.01,22000))
         val result = GpxDirectedRoadReview.inspect(fixes,graph) { f ->
             if (f.lat < 21.005) listOf(road(1,21.0)) else listOf(road(2,21.01))
         }
@@ -24,7 +24,7 @@ class GpxDirectedRoadReviewTest {
     }
 
     @Test fun disconnectedRoadRejected() {
-        val fixes = listOf(fix(21.0,1000),fix(21.01,2000))
+        val fixes = listOf(fix(21.0,1000),fix(21.01,22000))
         val result = GpxDirectedRoadReview.inspect(fixes,graph) { f ->
             if (f.lat < 21.005) listOf(road(1,21.0)) else listOf(road(3,21.01))
         }
