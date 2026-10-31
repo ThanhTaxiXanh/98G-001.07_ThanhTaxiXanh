@@ -1,9 +1,13 @@
 import 'dart:convert';
+import 'grid12_layout.dart';
 
 /// Pixel dimensions describe the *design preview*, never force Android Auto.
 class CarLayoutConfig {
   const CarLayoutConfig({
-    this.schemaVersion = 1,
+    this.schemaVersion = 2,
+    this.layoutPresetId = 'vf_e34',
+    this.useCustomLayout = false,
+    this.customLayout,
     this.targetWidthPx = 934,
     this.targetHeightPx = 844,
     this.columnRatio = 0.60,
@@ -17,6 +21,13 @@ class CarLayoutConfig {
   });
 
   final int schemaVersion, targetWidthPx, targetHeightPx, signWarningMeters;
+  final String layoutPresetId;
+  final bool useCustomLayout;
+  final Grid12Layout? customLayout;
+
+  Grid12Layout get activeLayout => useCustomLayout && customLayout != null
+      ? customLayout!
+      : Grid12Presets.byId(layoutPresetId).layout;
   final double columnRatio, calendarWeight, qrWeight, mediaWeight;
   final bool nightMode, showSpeedEstimates, map3d;
 
@@ -33,11 +44,15 @@ class CarLayoutConfig {
 
   CarLayoutConfig copyWith({
     int? targetWidthPx, int? targetHeightPx, int? signWarningMeters,
+    String? layoutPresetId, bool? useCustomLayout, Grid12Layout? customLayout,
     double? columnRatio, double? calendarWeight, double? qrWeight,
     double? mediaWeight, bool? nightMode, bool? showSpeedEstimates,
     bool? map3d,
   }) => CarLayoutConfig(
     schemaVersion: schemaVersion,
+    layoutPresetId: layoutPresetId ?? this.layoutPresetId,
+    useCustomLayout: useCustomLayout ?? this.useCustomLayout,
+    customLayout: customLayout ?? this.customLayout,
     targetWidthPx: targetWidthPx ?? this.targetWidthPx,
     targetHeightPx: targetHeightPx ?? this.targetHeightPx,
     columnRatio: (columnRatio ?? this.columnRatio).clamp(0.50, 0.70).toDouble(),
@@ -52,6 +67,9 @@ class CarLayoutConfig {
 
   Map<String, Object> toJson() => {
     'schemaVersion': schemaVersion,
+    'layoutPresetId': layoutPresetId,
+    'useCustomLayout': useCustomLayout,
+    if (customLayout != null) 'customLayout': customLayout!.toJson(),
     'targetWidthPx': targetWidthPx, 'targetHeightPx': targetHeightPx,
     'columnRatio': columnRatio, 'calendarWeight': calendarWeight,
     'qrWeight': qrWeight, 'mediaWeight': mediaWeight,
@@ -63,14 +81,36 @@ class CarLayoutConfig {
 
   factory CarLayoutConfig.decode(String raw) {
     final m = jsonDecode(raw) as Map<String, dynamic>;
-    if (m['schemaVersion'] != 1) {
+    final version = m['schemaVersion'];
+    if (version != 1 && version != 2) {
       throw const FormatException('Unsupported layout schema');
     }
     int integer(String key, int fallback) => (m[key] as num?)?.toInt() ?? fallback;
     double decimal(String key, double fallback) =>
         (m[key] as num?)?.toDouble() ?? fallback;
     bool boolean(String key, bool fallback) => m[key] as bool? ?? fallback;
+    final oldColumns = decimal('columnRatio', 0.60);
+    final oldCalendar = decimal('calendarWeight', 0.25);
+    final oldQr = decimal('qrWeight', 0.45);
+    final oldMedia = decimal('mediaWeight', 0.30);
+    if (version == 2 && !Grid12Presets.exists(
+        m['layoutPresetId'] is String ? m['layoutPresetId'] as String : 'vf_e34')) {
+      throw const FormatException('Unknown grid preset');
+    }
+    final savedCustom = version == 1
+        ? Grid12Presets.fromLegacy(oldColumns, oldCalendar, oldQr, oldMedia)
+        : m.containsKey('customLayout')
+            ? Grid12Layout.fromJson(m['customLayout'])
+            : null;
+    if (version == 2 && m['useCustomLayout'] == true && savedCustom == null) {
+      throw const FormatException('Missing custom layout');
+    }
     return CarLayoutConfig(
+      schemaVersion: 2,
+      layoutPresetId: version == 1 ? 'vf_e34' :
+          (m['layoutPresetId'] as String? ?? 'vf_e34'),
+      useCustomLayout: version == 1 || boolean('useCustomLayout', false),
+      customLayout: savedCustom,
       targetWidthPx: integer('targetWidthPx', 934).clamp(240, 7680).toInt(),
       targetHeightPx: integer('targetHeightPx', 844).clamp(240, 7680).toInt(),
       columnRatio: decimal('columnRatio', 0.60).clamp(0.50, 0.70).toDouble(),
