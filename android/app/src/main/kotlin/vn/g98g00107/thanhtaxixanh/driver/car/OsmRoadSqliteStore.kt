@@ -2,6 +2,8 @@ package vn.g98g00107.thanhtaxixanh.driver.car
 
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteException
+import android.util.Log
 import android.database.sqlite.SQLiteOpenHelper
 import android.net.Uri
 import java.io.ByteArrayOutputStream
@@ -37,12 +39,29 @@ object OsmRoadSqliteStore {
                     name TEXT NOT NULL
                 )
             """.trimIndent())
-            db.execSQL("""
-                CREATE VIRTUAL TABLE road_rtree USING rtree(
-                    id, min_lat, max_lat, min_lon, max_lon
-                )
-            """.trimIndent())
             db.execSQL("CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+            // Some Android ROMs and Robolectric SQLite builds omit SQLITE_ENABLE_RTREE.
+            // Preserve a correct (but slower) indexed bounding-box query on those devices.
+            try {
+                db.execSQL("""
+                    CREATE VIRTUAL TABLE road_rtree USING rtree(
+                        id, min_lat, max_lat, min_lon, max_lon
+                    )
+                """.trimIndent())
+                db.execSQL("INSERT INTO metadata(key,value) VALUES('indexType','RTree')")
+            } catch (e: SQLiteException) {
+                Log.w("ThanhTaxiRoadDb", "RTree unavailable; use B-tree bbox fallback", e)
+                db.execSQL("""
+                    CREATE TABLE road_rtree(
+                        id INTEGER PRIMARY KEY,
+                        min_lat REAL NOT NULL, max_lat REAL NOT NULL,
+                        min_lon REAL NOT NULL, max_lon REAL NOT NULL
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX road_lat_window ON road_rtree(min_lat, max_lat)")
+                db.execSQL("CREATE INDEX road_lon_window ON road_rtree(min_lon, max_lon)")
+                db.execSQL("INSERT INTO metadata(key,value) VALUES('indexType','BTreeBBox')")
+            }
         }
 
         override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
@@ -65,7 +84,7 @@ object OsmRoadSqliteStore {
                 "features" to (meta(db, "features")?.toIntOrNull() ?: 0),
                 "updatedAt" to (meta(db, "updatedAt")?.toLongOrNull() ?: 0L),
                 "source" to "User-imported OSM maxspeed (unverified)",
-                "storage" to "SQLite RTree M4"
+                "storage" to ("SQLite " + (meta(db, "indexType") ?: "Unknown"))
             )
         } finally {
             db.close()
