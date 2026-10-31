@@ -22,8 +22,9 @@ object TrafficPointRoadMatcher {
     private fun meters(lat: Double, lon: Double, originLat: Double): Pair<Double, Double> =
         Pair(EARTH * radians(lon) * cos(radians(originLat)), EARTH * radians(lat))
     private fun bearing(a: Pair<Double, Double>, b: Pair<Double, Double>): Double {
-        val x = (b.first - a.first) * cos(radians((a.second + b.second) / 2))
-        val y = b.second - a.second
+        // Coordinates are (latitude, longitude); bearing is atan2(east, north).
+        val x = (b.second - a.second) * cos(radians((a.first + b.first) / 2))
+        val y = b.first - a.first
         return (Math.toDegrees(atan2(x, y)) + 360.0) % 360.0
     }
 
