@@ -10,7 +10,7 @@ import kotlin.math.roundToLong
  */
 object OsmRoadFingerprint {
     private fun coordinate(latitude: Double, longitude: Double): String =
-        "\${(latitude * 10_000_000.0).roundToLong()},\${(longitude * 10_000_000.0).roundToLong()}"
+        "${(latitude * 10_000_000.0).roundToLong()},${(longitude * 10_000_000.0).roundToLong()}"
 
     fun sha256(road: OsmRoadSegment): String {
         val first = coordinate(road.lat1, road.lon1)
@@ -22,9 +22,9 @@ object OsmRoadFingerprint {
         val backward = if (reverse) road.forwardKmh else road.backwardKmh
         val oneway = if (reverse) -road.oneway else road.oneway
         val name = road.name.trim()
-        val content = "$start|$end|\${road.generalKmh ?: "?"}|" +
-            "\${forward ?: "?"}|\${backward ?: "?"}|$oneway|" +
-            "\${name.length}:$name"
+        val content = "$start|$end|${road.generalKmh ?: "?"}|" +
+            "${forward ?: "?"}|${backward ?: "?"}|$oneway|" +
+            "${name.length}:$name"
         return MessageDigest.getInstance("SHA-256")
             .digest(content.toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
