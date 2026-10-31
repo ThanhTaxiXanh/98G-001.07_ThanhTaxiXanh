@@ -75,6 +75,40 @@ class Grid12Layout {
     ]);
   }
 
+  /// Move a shared boundary by one or more grid cells. Both adjacent panels
+  /// resize together, so fully packed presets remain editable.
+  Grid12Layout shiftBoundary(GridPanel panel, GridPanel neighbor,
+      int delta, {required bool vertical}) {
+    if (panel == GridPanel.icons || neighbor == GridPanel.icons ||
+        panel == neighbor || delta == 0) {
+      throw const FormatException('Invalid boundary selection');
+    }
+    final a = tile(panel);
+    final b = tile(neighbor);
+    late final GridTile na, nb;
+    if (vertical) {
+      if (a.x != b.x || a.width != b.width ||
+          a.y + a.height != b.y) {
+        throw const FormatException('Panels do not share a horizontal edge');
+      }
+      na = GridTile(panel, a.x, a.y, a.width, a.height + delta);
+      nb = GridTile(neighbor, b.x, b.y + delta, b.width, b.height - delta);
+    } else {
+      if (a.y != b.y || a.height != b.height ||
+          a.x + a.width != b.x) {
+        throw const FormatException('Panels do not share a vertical edge');
+      }
+      na = GridTile(panel, a.x, a.y, a.width + delta, a.height);
+      nb = GridTile(neighbor, b.x + delta, b.y, b.width - delta, b.height);
+    }
+    return Grid12Layout([
+      for (final t in tiles)
+        if (t.panel == panel) na
+        else if (t.panel == neighbor) nb
+        else t,
+    ]);
+  }
+
   List<Map<String, Object>> toJson() =>
       tiles.map((t) => t.toJson()).toList(growable: false);
 
