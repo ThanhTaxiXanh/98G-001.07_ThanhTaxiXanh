@@ -40,7 +40,7 @@ object OsmTopologyParser {
             val wayId = osmId(props?.opt("osm_way_id"))
             val coordinates = geometry?.optJSONArray("coordinates")
             val nodes = props?.optJSONArray("osm_node_ids")
-            if (wayId == null || geometry?.optString("type") != "LineString" ||
+            if (props == null || wayId == null || geometry?.optString("type") != "LineString" ||
                 coordinates == null || nodes == null ||
                 nodes.length() != coordinates.length() || nodes.length() < 2) {
                 rejected++
