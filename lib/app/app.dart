@@ -655,7 +655,9 @@ class _SettingsHomeState extends State<SettingsHome> {
           'Topology khớp: ${gpxReview!['directedMatched']} · '
           'Thiếu dữ liệu: ${gpxReview!['directedMissing']} · '
           'Mơ hồ: ${gpxReview!['directedAmbiguous']} · '
-          'Không kết nối: ${gpxReview!['directedDisconnected']}. '
+          'Không kết nối: ${gpxReview!['directedDisconnected']} · '
+          'Sai hướng: ${gpxReview!['directedInvalidHeading']} · '
+          'Thời gian bất hợp lý: ${gpxReview!['directedImplausibleTime']}. '
           'Chỉ phân tích, chưa xác nhận đoạn đường.'),
     if (roadStatus['available'] == true)
       OutlinedButton.icon(
