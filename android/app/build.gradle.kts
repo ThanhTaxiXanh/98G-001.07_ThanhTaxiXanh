@@ -38,9 +38,13 @@ android {
         }
     }
     buildTypes {
-        debug { isMinifyEnabled = false }
+        debug {
+            isMinifyEnabled = false
+            isShrinkResources = false
+        }
         release {
             isMinifyEnabled = false
+            isShrinkResources = false
             val hasKey = rootProject.file("key.properties").exists()
             signingConfig = if (hasKey) signingConfigs.getByName("releaseUpload")
                 else signingConfigs.getByName("debug")
