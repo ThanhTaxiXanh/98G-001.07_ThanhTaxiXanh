@@ -16,6 +16,7 @@ object GpxDirectedRoadReview {
                       val restrictionRelations: Int = 0,
                       val resolvedRestrictionRelations: Int = 0,
                       val unresolvedRestrictionRelations: Int = 0,
+                      val restrictionCompatibility: String = "NOT_CHECKED",
                       val status: String = "UNVERIFIED_REVIEW_ONLY")
 
     data class Road(val id: Long, val lat1: Double, val lon1: Double,
@@ -138,7 +139,14 @@ object GpxDirectedRoadReview {
         val graph = OsmRoadSqliteStore.topologyGraph(context)
         val relations = OsmRestrictionSqliteStore.read(context)
         val resolution = OsmTurnRestrictionResolver.resolve(relations, graph.edges)
-        val review = inspect(fixes, graph, resolution.restrictions) { fix ->
+        val compatibility = OsmRestrictionSnapshotCompatibility.evaluate(
+            OsmRoadSqliteStore.topologySources(context),
+            relations.map { it.source }.toSet(),
+            relations.size
+        )
+        val applicable = if (compatibility.compatibleForReview)
+            resolution.restrictions else emptySet()
+        val review = inspect(fixes, graph, applicable) { fix ->
             OsmRoadSqliteStore.nearbyIdentified(context,fix.lat,fix.lon)?.map {
                 Road(it.roadId,it.segment.lat1,it.segment.lon1,
                     it.segment.lat2,it.segment.lon2)
@@ -147,7 +155,8 @@ object GpxDirectedRoadReview {
         return review.copy(
             restrictionRelations = relations.size,
             resolvedRestrictionRelations = resolution.resolvedRelations,
-            unresolvedRestrictionRelations = resolution.unresolvedRelations
+            unresolvedRestrictionRelations = resolution.unresolvedRelations,
+            restrictionCompatibility = compatibility.reason
         )
     }
 }
