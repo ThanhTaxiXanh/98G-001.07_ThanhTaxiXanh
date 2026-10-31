@@ -15,7 +15,9 @@ class GridTile {
       return x == 0 && y == 0 && width == 1 && height == 12;
     }
     if (x < 1) return false;
-    if (panel == GridPanel.map) return width >= 4 && height >= 5;
+    if (panel == GridPanel.map) {
+      return width >= 4 && height >= 5;
+    }
     return width >= 2 && height >= 2;
   }
 
