@@ -40,7 +40,9 @@ class _TrafficPointPanelState extends State<TrafficPointPanel> {
     try {
       final result = await channel.invokeMapMethod<String, dynamic>(
         'reviewTrafficPointsNear', {'lat': lat, 'lon': lon});
-      if (mounted && result != null) setState(() => review = Map<String, dynamic>.from(result));
+      if (mounted && result != null) {
+        setState(() => review = Map<String, dynamic>.from(result));
+      }
     } on PlatformException catch (e) {
       if (mounted) setState(() => error = e.message ?? 'Không đọc được điểm.');
     } on MissingPluginException {
