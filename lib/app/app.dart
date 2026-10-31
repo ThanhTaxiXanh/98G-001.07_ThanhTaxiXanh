@@ -5,6 +5,9 @@ import '../features/car_layout/layout_config.dart';
 import '../features/car_layout/layout_store.dart';
 import '../features/car_preview/car_preview.dart';
 import '../features/payments/vietqr.dart';
+import '../features/lunar_calendar/lunar_calendar.dart';
+import '../features/events/calendar_events.dart';
+import '../features/events/event_store.dart';
 
 class TaxiApp extends StatefulWidget {
   const TaxiApp({super.key});
@@ -54,12 +57,19 @@ class _SettingsHomeState extends State<SettingsHome> {
   final eventTitle = TextEditingController();
   final eventDay = TextEditingController();
   final eventMonth = TextEditingController();
-  List<Map<String, dynamic>> events = [];
+  final eventYear = TextEditingController();
+  final eventStore = CalendarEventStore();
+  bool eventLunar = false;
+  bool eventLeap = false;
+  EventRepeat eventRepeat = EventRepeat.annual;
+  int? editingEventId;
+  String eventError = '';
 
   @override
   void initState() {
     super.initState();
     unawaited(_loadFields());
+    unawaited(eventStore.load());
   }
   Future<void> _loadFields() async {
     final p = await SharedPreferences.getInstance();
@@ -105,9 +115,10 @@ class _SettingsHomeState extends State<SettingsHome> {
   @override
   void dispose() {
     for (final c in [bin, account, holder, memo, amount,
-      eventTitle, eventDay, eventMonth]) {
+      eventTitle, eventDay, eventMonth, eventYear]) {
       c.dispose();
     }
+    eventStore.dispose();
     super.dispose();
   }
 
@@ -238,50 +249,198 @@ class _SettingsHomeState extends State<SettingsHome> {
         'Không dùng bản preview để quyết định tốc độ lái xe.'),
   ]);
 
-  Widget _eventsPage() => _scroll([
-    _section('Lịch và sự kiện Việt Nam'),
-    const Text('Danh sách nhập thử cho mốc đầu; chuyển sang lịch âm + '
-        'SQLite và nhắc sự kiện ở giai đoạn tiếp theo.'),
-    TextField(controller: eventTitle,
-        decoration: const InputDecoration(labelText: 'Tên sự kiện')),
-    Row(children: [
-      Expanded(child: TextField(controller: eventDay,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: 'Ngày dương'))),
-      const SizedBox(width: 12),
-      Expanded(child: TextField(controller: eventMonth,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: 'Tháng dương'))),
-    ]),
-    const SizedBox(height: 8),
-    FilledButton.icon(
-      onPressed: () {
-        final d = int.tryParse(eventDay.text);
-        final m = int.tryParse(eventMonth.text);
-        if (eventTitle.text.trim().isEmpty || d == null ||
-            m == null || d < 1 || m < 1 || m > 12) { return; }
-        try {
-          DateTime(2028, m, d);
-          final limit = DateTime(2028, m + 1, 0).day;
-          if (d > limit) { return; }
-        } catch (_) { return; }
-        setState(() => events.add({
-          'title': eventTitle.text.trim(), 'day': d, 'month': m,
-        }));
-        eventTitle.clear();
-      },
-      icon: const Icon(Icons.add), label: const Text('Thêm sự kiện thử'),
-    ),
-    for (var i = 0; i < events.length; i++)
-      ListTile(
-        title: Text(events[i]['title'] as String),
-        subtitle: Text('${events[i]['day']}/${events[i]['month']}'),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete_outline),
-          onPressed: () => setState(() => events.removeAt(i)),
+  Future<void> _saveEvent() async {
+    final title = eventTitle.text.trim();
+    final day = int.tryParse(eventDay.text.trim());
+    final month = int.tryParse(eventMonth.text.trim());
+    final year = int.tryParse(eventYear.text.trim());
+    String? error;
+    if (title.isEmpty || day == null || month == null ||
+        month < 1 || month > 12 || day < 1 ||
+        day > (eventLunar ? 30 : 31)) {
+      error = 'Nhập tên, ngày và tháng hợp lệ.';
+    } else if (eventRepeat == EventRepeat.once &&
+        (year == null || year < 1900 || year > 2100)) {
+      error = 'Sự kiện một lần cần có năm từ 1900 đến 2100.';
+    } else if (!eventLunar) {
+      final probe = DateTime.utc(year ?? 2028, month, day);
+      if (probe.day != day || probe.month != month) {
+        error = 'Ngày này không tồn tại trong tháng đã chọn.';
+      }
+    } else if (eventRepeat == EventRepeat.once &&
+        LunarCalendar.lunarToSolar(day, month, year!,
+            leap: eventLeap) == null) {
+      error = 'Ngày âm lịch hoặc tháng nhuận không hợp lệ.';
+    }
+    if (error != null) {
+      setState(() => eventError = error!);
+      return;
+    }
+    try {
+      await eventStore.upsert(CalEvent(
+        id: editingEventId ?? eventStore.nextId(),
+        title: title,
+        lunar: eventLunar,
+        leap: eventLunar && eventLeap,
+        day: day!,
+        month: month!,
+        year: eventRepeat == EventRepeat.once ? year! : 0,
+        repeat: eventRepeat,
+      ));
+      if (!mounted) return;
+      setState(_resetEventForm);
+    } catch (e) {
+      if (mounted) setState(() => eventError = 'Lưu thất bại: ' + e.toString());
+    }
+  }
+
+  void _resetEventForm() {
+    eventTitle.clear();
+    eventDay.clear();
+    eventMonth.clear();
+    eventYear.clear();
+    eventLunar = false;
+    eventLeap = false;
+    eventRepeat = EventRepeat.annual;
+    editingEventId = null;
+    eventError = '';
+  }
+
+  void _editEvent(CalEvent e) {
+    setState(() {
+      editingEventId = e.id;
+      eventTitle.text = e.title;
+      eventDay.text = e.day.toString();
+      eventMonth.text = e.month.toString();
+      eventYear.text = e.repeat == EventRepeat.once ? e.year.toString() : '';
+      eventLunar = e.lunar;
+      eventLeap = e.leap;
+      eventRepeat = e.repeat;
+      eventError = '';
+    });
+  }
+
+  String _dateLabel(DateTime d) => [d.day, d.month, d.year].join('/');
+
+  Widget _eventsPage() => AnimatedBuilder(
+    animation: eventStore,
+    builder: (context, child) {
+      final today = LunarCalendar.vietnamToday(DateTime.now().toUtc());
+      final lunar = LunarCalendar.solarToLunar(
+        today.day, today.month, today.year);
+      final upcoming = <({CalEvent event, DateTime date})>[];
+      for (final e in [...CalendarEvents.defaults, ...eventStore.events]) {
+        final when = CalendarEvents.nextOccurrence(e, today);
+        if (when != null) upcoming.add((event: e, date: when));
+      }
+      upcoming.sort((a, b) => a.date.compareTo(b.date));
+      return _scroll([
+        _section('Lịch và sự kiện Việt Nam'),
+        Text('Hôm nay: ' + _dateLabel(today) +
+            ' • Âm lịch ' + lunar.toString() +
+            ' • Năm ' + LunarCalendar.canChi(lunar.year)),
+        const Text('Dữ liệu cá nhân lưu ngoại tuyến bằng JSON phiên bản 1; '
+            'sẽ chuyển sang SQLite. Chưa bật thông báo nhắc trước.'),
+        if (eventStore.loadError != null)
+          Text(eventStore.loadError!,
+              style: const TextStyle(color: Colors.orange)),
+        _section('Sự kiện sắp diễn ra'),
+        for (final next in upcoming.take(6))
+          ListTile(
+            title: Text(next.event.title),
+            subtitle: Text(_dateLabel(next.date) +
+                (next.event.lunar ? ' • Âm lịch' : ' • Dương lịch')),
+            trailing: Text(next.date == today ? 'Hôm nay' :
+                'Còn ' + next.date.difference(today).inDays.toString() +
+                ' ngày'),
+          ),
+        _section(editingEventId == null ? 'Thêm sự kiện cá nhân' :
+            'Chỉnh sửa sự kiện'),
+        TextField(controller: eventTitle,
+            decoration: const InputDecoration(labelText: 'Tên sự kiện')),
+        SwitchListTile(
+          title: const Text('Sự kiện âm lịch'),
+          value: eventLunar,
+          onChanged: (v) => setState(() {
+            eventLunar = v;
+            if (!v) eventLeap = false;
+          }),
         ),
-      ),
-  ]);
+        if (eventLunar)
+          SwitchListTile(
+            title: const Text('Tháng nhuận'),
+            subtitle: const Text('Chỉ lặp trong đúng tháng nhuận đã chọn'),
+            value: eventLeap,
+            onChanged: (v) => setState(() => eventLeap = v),
+          ),
+        DropdownButton<EventRepeat>(
+          isExpanded: true,
+          value: eventRepeat,
+          items: const [
+            DropdownMenuItem(value: EventRepeat.annual,
+                child: Text('Lặp hằng năm')),
+            DropdownMenuItem(value: EventRepeat.monthly,
+                child: Text('Lặp hằng tháng')),
+            DropdownMenuItem(value: EventRepeat.once,
+                child: Text('Chỉ một lần')),
+          ],
+          onChanged: (value) {
+            if (value != null) setState(() => eventRepeat = value);
+          },
+        ),
+        Row(children: [
+          Expanded(child: TextField(controller: eventDay,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Ngày'))),
+          const SizedBox(width: 12),
+          Expanded(child: TextField(controller: eventMonth,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Tháng'))),
+          if (eventRepeat == EventRepeat.once) ...[
+            const SizedBox(width: 12),
+            Expanded(child: TextField(controller: eventYear,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Năm'))),
+          ],
+        ]),
+        if (eventError.isNotEmpty)
+          Text(eventError, style: const TextStyle(color: Colors.orange)),
+        const SizedBox(height: 12),
+        FilledButton.icon(
+          onPressed: () => unawaited(_saveEvent()),
+          icon: Icon(editingEventId == null ? Icons.add : Icons.save),
+          label: Text(editingEventId == null ? 'Lưu sự kiện' :
+              'Cập nhật sự kiện'),
+        ),
+        if (editingEventId != null)
+          TextButton(onPressed: () => setState(_resetEventForm),
+              child: const Text('Hủy chỉnh sửa')),
+        _section('Sự kiện cá nhân đã lưu'),
+        if (!eventStore.loaded) const Text('Đang đọc dữ liệu ngoại tuyến…'),
+        if (eventStore.loaded && eventStore.events.isEmpty)
+          const Text('Chưa có sự kiện cá nhân.'),
+        for (final e in eventStore.events)
+          ListTile(
+            title: Text(e.title),
+            subtitle: Text([e.day, e.month].join('/') +
+                (e.lunar ? ' âm lịch' : ' dương lịch')),
+            trailing: Wrap(mainAxisSize: MainAxisSize.min, children: [
+              IconButton(
+                icon: const Icon(Icons.edit_outlined),
+                tooltip: 'Chỉnh sửa',
+                onPressed: () => _editEvent(e),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline),
+                tooltip: 'Xóa sự kiện',
+                onPressed: () => unawaited(eventStore.remove(e.id)),
+              ),
+            ]),
+          ),
+      ]);
+    },
+  );
+
   Widget _qrPage() => _scroll([
     _section('Tạo VietQR ngoại tuyến'),
     const Text('Nhập BIN ngân hàng (6 số) và tài khoản (6–19 số). '
