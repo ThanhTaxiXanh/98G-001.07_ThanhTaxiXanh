@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../features/car_layout/layout_config.dart';
 import '../features/car_layout/layout_store.dart';
@@ -58,6 +59,9 @@ class _SettingsHomeState extends State<SettingsHome> {
   final eventDay = TextEditingController();
   final eventMonth = TextEditingController();
   final eventYear = TextEditingController();
+  static const locationChannel = MethodChannel('vn.g98g00107.thanhtaxixanh.driver/config');
+  bool? locationGranted;
+  String locationError = '';
   final eventStore = CalendarEventStore();
   bool eventLunar = false;
   bool eventLeap = false;
@@ -69,6 +73,7 @@ class _SettingsHomeState extends State<SettingsHome> {
   void initState() {
     super.initState();
     unawaited(_loadFields());
+    unawaited(_checkLocationPermission());
     unawaited(eventStore.load());
   }
   Future<void> _loadFields() async {
@@ -84,6 +89,34 @@ class _SettingsHomeState extends State<SettingsHome> {
     try {
       _buildQr(persist: false);
     } catch (_) {/* User input can be incomplete. */}
+  }
+
+  Future<void> _checkLocationPermission() async {
+    try {
+      final granted = await locationChannel.invokeMethod<bool>('getLocationPermission');
+      if (mounted) setState(() => locationGranted = granted ?? false);
+    } on MissingPluginException {
+      // Widget tests or non-Android preview.
+    } on PlatformException catch (e) {
+      if (mounted) setState(() => locationError = e.message ?? 'Không kiểm tra được GPS');
+    }
+  }
+
+  Future<void> _requestLocationPermission() async {
+    try {
+      final granted = await locationChannel.invokeMethod<bool>('requestLocationPermission');
+      if (mounted) {
+        setState(() {
+          locationGranted = granted ?? false;
+          locationError = locationGranted == true
+              ? '' : 'Chưa cấp quyền vị trí. Có thể mở Cài đặt Android để cấp lại.';
+        });
+      }
+    } on MissingPluginException {
+      if (mounted) setState(() => locationError = 'Chỉ cấp quyền trên thiết bị Android.');
+    } on PlatformException catch (e) {
+      if (mounted) setState(() => locationError = e.message ?? 'Yêu cầu GPS không thành công');
+    }
   }
 
   void _buildQr({bool persist = true}) {
@@ -220,6 +253,16 @@ class _SettingsHomeState extends State<SettingsHome> {
 
   Widget _mapPage(CarLayoutConfig c) => _scroll([
     _section('Bản đồ và cảnh báo giao thông'),
+    const Text('Bản đồ trên xe lấy vị trí từ điện thoại. Chỉ yêu cầu GPS '
+        'khi người dùng nhấn cấp quyền; dữ liệu có thể cần kết nối Internet.'),
+    FilledButton.icon(
+      onPressed: () => unawaited(_requestLocationPermission()),
+      icon: const Icon(Icons.my_location),
+      label: Text(locationGranted == true ? 'GPS đã được cấp quyền' : 'Cấp quyền vị trí GPS'),
+    ),
+    if (locationError.isNotEmpty)
+      Text(locationError, style: const TextStyle(color: Colors.orange)),
+
     SwitchListTile(
       title: const Text('Bản đồ 3D'),
       subtitle: const Text('Tùy chọn thiết kế; chưa tích hợp renderer MapLibre'),
