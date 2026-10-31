@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide GridTile;
 import 'grid12_layout.dart';
 
 /// Phone-only layout editor. Yellow corner = resize; drag tile = move.
@@ -27,9 +27,13 @@ class _Grid12EditorState extends State<Grid12Editor> {
     final p = d.localPosition;
     final tile = value.tiles.reversed.where((t) =>
         Grid12Geometry.bounds(t, w, h).contains(p.dx, p.dy)).firstOrNull;
-    if (tile == null) return;
+    if (tile == null) {
+      return;
+    }
     setState(() => selected = tile.panel);
-    if (tile.panel == GridPanel.icons) return;
+    if (tile.panel == GridPanel.icons) {
+      return;
+    }
     final b = Grid12Geometry.bounds(tile, w, h);
     activeTile = tile;
     original = value;
@@ -42,7 +46,9 @@ class _Grid12EditorState extends State<Grid12Editor> {
     final tile = activeTile;
     final origin = original;
     final p = start;
-    if (tile == null || origin == null || p == null) return;
+    if (tile == null || origin == null || p == null) {
+      return;
+    }
     final dx = ((d.localPosition.dx - p.dx) * 12 / w).round();
     final dy = ((d.localPosition.dy - p.dy) * 12 / h).round();
     try {
@@ -59,10 +65,15 @@ class _Grid12EditorState extends State<Grid12Editor> {
   }
 
   void end() {
-    if (activeTile == null) return;
+    if (activeTile == null) {
+      return;
+    }
     final next = preview;
-    if (next != null) widget.onEdited(next);
-    else if (rejected) widget.onRejected?.call('Ô chồng lấn hoặc vượt lưới.');
+    if (next != null) {
+      widget.onEdited(next);
+    } else if (rejected) {
+      widget.onRejected?.call('Ô chồng lấn hoặc vượt lưới.');
+    }
     setState(() {
       preview = null; original = null; activeTile = null; start = null;
       rejected = false;
@@ -104,7 +115,7 @@ class Grid12EditorPainter extends CustomPainter {
   final GridPanel selected;
   @override
   void paint(Canvas canvas, Size size) {
-    canvas.drawColor(const Color(0xff071423));
+    canvas.drawColor(const Color(0xff071423), BlendMode.src);
     const labels = {
       GridPanel.icons: '≡', GridPanel.map: 'BẢN ĐỒ',
       GridPanel.calendar: 'LỊCH', GridPanel.qr: 'VIETQR',

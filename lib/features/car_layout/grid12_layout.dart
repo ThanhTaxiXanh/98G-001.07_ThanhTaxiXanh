@@ -10,11 +10,15 @@ class GridTile {
 
   bool get isValid {
     if (x < 0 || y < 0 || width < 1 || height < 1 ||
-        x + width > 12 || y + height > 12) return false;
+        x + width > 12 || y + height > 12) {
+      return false;
+    }
     if (panel == GridPanel.icons) {
       return x == 0 && y == 0 && width == 1 && height == 12;
     }
-    if (x < 1) return false;
+    if (x < 1) {
+      return false;
+    }
     if (panel == GridPanel.map) {
       return width >= 4 && height >= 5;
     }

@@ -92,8 +92,7 @@ class CarPreview extends StatelessWidget {
                       }),
                   ])))))),
         const SizedBox(height: 4),
-        Text('Preview: ' + config.targetWidthPx.toString() + ' × ' +
-            config.targetHeightPx.toString() + ' px · lưới 12×12',
+        Text('Preview: ${config.targetWidthPx} × ${config.targetHeightPx} px · lưới 12×12',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodySmall),
       ]);
