@@ -420,23 +420,16 @@ object OsmRoadSqliteStore {
                             link.toNode.matches(Regex("[1-9][0-9]{0,18}")) &&
                             link.fromNode != link.toNode &&
                             link.source.isNotBlank() && link.source.length <= 256)
+                        // Use the same canonical fingerprint as replace(). A SQL
+                        // comparison of REAL coordinates against string bindings
+                        // is not stable across SQLite/Android implementations.
                         val ids = ArrayList<Long>()
                         db.rawQuery("""
-                            SELECT id FROM roads
-                            WHERE lat1=? AND lon1=? AND lat2=? AND lon2=?
-                              AND COALESCE(base_kmh,-1)=?
-                              AND COALESCE(forward_kmh,-1)=?
-                              AND COALESCE(backward_kmh,-1)=?
-                              AND oneway=? AND name=?
+                            SELECT r.id FROM road_fingerprints AS fp
+                            JOIN roads AS r ON r.id = fp.road_id
+                            WHERE fp.fingerprint=?
                             LIMIT 2
-                        """.trimIndent(), arrayOf(
-                            road.lat1.toString(), road.lon1.toString(),
-                            road.lat2.toString(), road.lon2.toString(),
-                            (road.generalKmh ?: -1).toString(),
-                            (road.forwardKmh ?: -1).toString(),
-                            (road.backwardKmh ?: -1).toString(),
-                            road.oneway.toString(), road.name
-                        )).use { cursor ->
+                        """.trimIndent(), arrayOf(OsmRoadFingerprint.sha256(road))).use { cursor ->
                             while (cursor.moveToNext()) ids.add(cursor.getLong(0))
                         }
                         require(ids.size == 1) { "Topology geometry not unique or missing" }
