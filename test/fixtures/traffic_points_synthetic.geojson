@@ -1,0 +1,22 @@
+{
+  "type": "FeatureCollection",
+  "name": "SYNTHETIC_TEST_ONLY_DO_NOT_DRIVE",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [106.2083, 21.2815]
+      },
+      "properties": {
+        "kind": "speed_limit",
+        "speedKmh": 50,
+        "bearing": 180,
+        "source": "SYNTHETIC_TEST_ONLY",
+        "license": "SYNTHETIC_NOT_FOR_DRIVING",
+        "sourceRef": "fixture/example-1",
+        "verification": "VERIFIED"
+      }
+    }
+  ]
+}
