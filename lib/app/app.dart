@@ -290,7 +290,7 @@ class _SettingsHomeState extends State<SettingsHome> {
       if (!mounted) return;
       setState(_resetEventForm);
     } catch (e) {
-      if (mounted) setState(() => eventError = 'Lưu thất bại: ' + e.toString());
+      if (mounted) setState(() => eventError = 'Lưu thất bại: $e');
     }
   }
 
@@ -336,9 +336,7 @@ class _SettingsHomeState extends State<SettingsHome> {
       upcoming.sort((a, b) => a.date.compareTo(b.date));
       return _scroll([
         _section('Lịch và sự kiện Việt Nam'),
-        Text('Hôm nay: ' + _dateLabel(today) +
-            ' • Âm lịch ' + lunar.toString() +
-            ' • Năm ' + LunarCalendar.canChi(lunar.year)),
+        Text('Hôm nay: ${_dateLabel(today)} • Âm lịch $lunar • Năm ${LunarCalendar.canChi(lunar.year)}'),
         const Text('Dữ liệu cá nhân lưu ngoại tuyến bằng JSON phiên bản 1; '
             'sẽ chuyển sang SQLite. Chưa bật thông báo nhắc trước.'),
         if (eventStore.loadError != null)
@@ -348,11 +346,9 @@ class _SettingsHomeState extends State<SettingsHome> {
         for (final next in upcoming.take(6))
           ListTile(
             title: Text(next.event.title),
-            subtitle: Text(_dateLabel(next.date) +
-                (next.event.lunar ? ' • Âm lịch' : ' • Dương lịch')),
+            subtitle: Text('${_dateLabel(next.date)}${next.event.lunar ? ' • Âm lịch' : ' • Dương lịch'}'),
             trailing: Text(next.date == today ? 'Hôm nay' :
-                'Còn ' + next.date.difference(today).inDays.toString() +
-                ' ngày'),
+                'Còn ${next.date.difference(today).inDays} ngày'),
           ),
         _section(editingEventId == null ? 'Thêm sự kiện cá nhân' :
             'Chỉnh sửa sự kiện'),
@@ -422,9 +418,8 @@ class _SettingsHomeState extends State<SettingsHome> {
         for (final e in eventStore.events)
           ListTile(
             title: Text(e.title),
-            subtitle: Text([e.day, e.month].join('/') +
-                (e.lunar ? ' âm lịch' : ' dương lịch')),
-            trailing: Wrap(mainAxisSize: MainAxisSize.min, children: [
+            subtitle: Text('${e.day}/${e.month}${e.lunar ? ' âm lịch' : ' dương lịch'}'),
+            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
               IconButton(
                 icon: const Icon(Icons.edit_outlined),
                 tooltip: 'Chỉnh sửa',

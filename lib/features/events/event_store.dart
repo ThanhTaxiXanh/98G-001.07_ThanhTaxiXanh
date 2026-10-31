@@ -27,7 +27,9 @@ class CalendarEventStore extends ChangeNotifier {
         if (decoded is! List) throw const FormatException('Events must be a list');
         final restored = <CalEvent>[];
         for (final entry in decoded) {
-          if (entry is! Map<String, dynamic>) continue;
+          if (entry is! Map<String, dynamic>) {
+            continue;
+          }
           try {
             final event = CalEvent.fromJson(entry);
             if (event.id > 0 && event.title.trim().isNotEmpty &&
@@ -43,7 +45,7 @@ class CalendarEventStore extends ChangeNotifier {
       }
       loadError = null;
     } catch (e) {
-      loadError = 'Không thể đọc sự kiện đã lưu: ' + e.toString();
+      loadError = 'Không thể đọc sự kiện đã lưu: $e';
     }
     loaded = true;
     notifyListeners();
