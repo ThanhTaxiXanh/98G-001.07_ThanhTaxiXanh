@@ -11,6 +11,7 @@ import kotlin.math.*
 object GpxDirectedRoadReview {
     data class Report(val points: Int, val matched: Int, val missing: Int,
                       val ambiguous: Int, val disconnected: Int,
+                      val invalidHeading: Int = 0, val implausibleTime: Int = 0,
                       val status: String = "UNVERIFIED_REVIEW_ONLY")
 
     data class Road(val id: Long, val lat1: Double, val lon1: Double,
@@ -42,6 +43,9 @@ object GpxDirectedRoadReview {
         var ambiguous = 0
         var disconnected = 0
         var previous: String? = null
+        var previousFix: GpsTraceRoadReview.Fix? = null
+        var invalidHeading = 0
+        var implausibleTime = 0
         for (fix in fixes) {
             if (fix.heading == null || fix.accuracyM !in 0.0..25.0) {
                 missing++
@@ -68,7 +72,28 @@ object GpxDirectedRoadReview {
                 continue
             }
             val roadId = options[0].first
+            val road = roads.firstOrNull { it.id.toString() == roadId }
             val current = byRoad[roadId].orEmpty()
+            val headingOk = road != null && current.any { edge ->
+                val forward = GpxTransitionSanity.bearing(
+                    road.lat1, road.lon1, road.lat2, road.lon2)
+                val directedBearing = if (edge.id.endsWith(":r"))
+                    (forward + 180.0) % 360.0 else forward
+                GpxTransitionSanity.headingAllowed(fix.heading, directedBearing)
+            }
+            if (!headingOk) {
+                invalidHeading++
+                previous = null
+                previousFix = null
+                continue
+            }
+            if (previousFix != null &&
+                !GpxTransitionSanity.travelAllowed(previousFix, fix).allowed) {
+                implausibleTime++
+                previous = null
+                previousFix = null
+                continue
+            }
             if (current.isEmpty()) {
                 missing++
                 previous = null
@@ -87,8 +112,10 @@ object GpxDirectedRoadReview {
             }
             matched++
             previous = roadId
+            previousFix = fix
         }
-        return Report(fixes.size,matched,missing,ambiguous,disconnected)
+        return Report(fixes.size,matched,missing,ambiguous,disconnected,
+            invalidHeading,implausibleTime)
     }
 
     fun inspectOffline(context: Context, fixes: List<GpsTraceRoadReview.Fix>): Report {
