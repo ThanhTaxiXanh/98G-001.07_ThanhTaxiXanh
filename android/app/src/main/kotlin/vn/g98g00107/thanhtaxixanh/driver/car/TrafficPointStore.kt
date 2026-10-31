@@ -103,9 +103,12 @@ object TrafficPointStore {
             val kind = text(props, "kind", 48, true)!!
             require(kind in supportedKinds) { "Loại biển/camera chưa hỗ trợ: $kind" }
             val speed = if (props.has("speedKmh") && !props.isNull("speedKmh")) {
-                val n = props.getInt("speedKmh")
-                require(n in 5..130 && n % 5 == 0) { "Tốc độ không hợp lệ tại Feature $i" }
-                n
+                val rawSpeed = props.get("speedKmh")
+                require(rawSpeed is Number) { "speedKmh phải là số tại Feature $i" }
+                val value = rawSpeed.toDouble()
+                require(value.isFinite() && value in 5.0..130.0 &&
+                    value % 5.0 == 0.0) { "Tốc độ không hợp lệ tại Feature $i" }
+                value.toInt()
             } else null
             require(kind != "speed_limit" || speed != null) { "speed_limit cần speedKmh" }
             require(kind == "speed_limit" || speed == null) { "speedKmh chỉ dành cho speed_limit" }
