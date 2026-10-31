@@ -355,6 +355,7 @@ object OsmRoadSqliteStore {
                     insertIndex.close()
                     reserveFingerprint.close()
                     updateFingerprint.close()
+                    insertTopology?.close()
                 }
                 finalCount = (if (append) oldCount else 0) + inserted
                 finalFeatures = oldFeatures + (if (inserted > 0) featureCount else 0)
