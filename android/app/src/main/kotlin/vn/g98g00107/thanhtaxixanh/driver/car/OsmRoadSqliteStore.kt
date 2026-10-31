@@ -381,6 +381,18 @@ object OsmRoadSqliteStore {
         return Summary(finalCount, finalFeatures, now)
     }
 
+    /** M5.3J: full replacement only. Parse before opening the database;
+     * write roads, fingerprints, spatial index and topology atomically.
+     */
+    @Synchronized
+    fun importTopologyGeoJson(context: Context, geoJson: String,
+                              source: String): Summary {
+        val plan = OsmTopologyImportPlan.prepare(geoJson, source)
+        return replace(context, plan.entries.map { it.first },
+            plan.entries.size + plan.skippedNonSpeedFeatures,
+            topology = plan.entries.map { it.second })
+    }
+
     /**
      * M5.3E: attach explicit topology to one EXACT existing road geometry.
      * This is not an automatic import: caller must provide a trusted segment
