@@ -2,6 +2,10 @@ package vn.g98g00107.thanhtaxixanh.driver.car
 
 import android.Manifest
 import android.content.Context
+import android.content.BroadcastReceiver
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -60,6 +64,29 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
     private var matchSequence = 0
     private var roadDataError: String? = null
     private var lastDashboardDiagnostic: String? = null
+    private var currentTiles = CarGrid12Layout.read(context)
+    private var receiverRegistered = false
+    private val configReceiver = object : BroadcastReceiver() {
+        override fun onReceive(receiverContext: Context?, intent: Intent?) {
+            currentTiles = CarGrid12Layout.read(context)
+            CarSurfaceTelemetry.record(context, "layoutUpdated", width, height,
+                visible, stable, extra = "phoneGrid12")
+            drawFrame()
+        }
+    }
+
+    private fun listenForLayoutChanges() {
+        if (receiverRegistered) return
+        val filter = IntentFilter(
+            "vn.g98g00107.thanhtaxixanh.driver.CONFIG_CHANGED")
+        if (Build.VERSION.SDK_INT >= 33) {
+            context.registerReceiver(configReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            context.registerReceiver(configReceiver, filter)
+        }
+        receiverRegistered = true
+    }
+
 
 
     private val locationListener = object : LocationListener {
@@ -125,6 +152,8 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
         roadMatch = null
         roadDataError = null
         lastDashboardDiagnostic = null
+        currentTiles = CarGrid12Layout.read(context)
+        listenForLayoutChanges()
         targetSurface = container.surface
         width = container.width
         height = container.height
@@ -269,14 +298,13 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
                 safeViewport.bounds.width() >= 280 &&
                 safeViewport.bounds.height() >= 150
             val mapArea = if (dashboard) {
-                val bounds = safeViewport.bounds
-                Rect(bounds.left, bounds.top,
-                    bounds.left + (bounds.width() * 0.67f).toInt(), bounds.bottom)
+                CarGrid12Layout.bounds(currentTiles.first { it.name == "map" },
+                    safeViewport.bounds)
             } else Rect(0, 0, width, height)
             lastMap?.takeIf { !it.isRecycled }?.let {
                 canvas.drawBitmap(it, null, mapArea, Paint(Paint.FILTER_BITMAP_FLAG))
             }
-            if (dashboard) drawDashboardTiles(canvas, safeViewport.bounds)
+            if (dashboard) drawGrid12Tiles(canvas, safeViewport.bounds)
             val dashboardDiagnostic = if (dashboard) "visible" else when {
                 !safeViewport.overlaySafe -> "hostInsetsUnknown"
                 safeViewport.bounds.width() < 280 -> "safeWidthTooSmall"
@@ -355,37 +383,49 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
      * AA host Surface preview only: fixed, noninteractive status tiles.
      * Calendar, QR and media integrations require separate verified sources.
      */
-    private fun drawDashboardTiles(canvas: Canvas, safe: Rect) {
-        val left = safe.left + (safe.width() * 0.67f).toInt() + 5f
-        val right = safe.right - 5f
-        val gap = 6f
-        val top = safe.top + 5f
-        val bottom = safe.bottom - 5f
-        val tileHeight = (bottom - top - gap * 2f) / 3f
-        val panel = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.rgb(20, 34, 49)
-        }
+    private fun drawGrid12Tiles(canvas: Canvas, safe: Rect) {
+        val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.rgb(20, 34, 49) }
         val title = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
-            textSize = (safe.height() / 19f).coerceIn(12f, 21f)
+            textSize = (safe.height() / 19f).coerceIn(11f, 21f)
             isFakeBoldText = true
         }
         val subtitle = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.rgb(180, 199, 215)
-            textSize = (safe.height() / 26f).coerceIn(10f, 16f)
+            textSize = (safe.height() / 26f).coerceIn(9f, 16f)
         }
-        val labels = arrayOf("LỊCH VIỆT NAM", "MÃ QR THANH TOÁN", "MEDIA")
-        val details = arrayOf(
+        val names = mapOf("calendar" to "LỊCH VIỆT NAM",
+            "qr" to "MÃ QR THANH TOÁN", "media" to "MEDIA",
+            "icons" to "TX")
+        val details = mapOf("calendar" to
             LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),
-            "Chưa chọn ảnh QR",
-            "Chưa kết nối trình phát"
-        )
-        for (i in 0..2) {
-            val y = top + i * (tileHeight + gap)
-            canvas.drawRoundRect(RectF(left, y, right, y + tileHeight), 10f, 10f, panel)
-            val textX = left + 10f
-            canvas.drawText(labels[i], textX, y + tileHeight * 0.42f, title)
-            canvas.drawText(details[i], textX, y + tileHeight * 0.72f, subtitle)
+            "qr" to "Chưa chọn ảnh QR", "media" to "Chưa kết nối trình phát")
+        for (tile in currentTiles) {
+            if (tile.name == "map") continue
+            val rect = CarGrid12Layout.bounds(tile, safe)
+            val x = rect.left + 4f; val y = rect.top + 4f
+            val right = rect.right - 4f; val bottom = rect.bottom - 4f
+            if (right <= x || bottom <= y) continue
+            canvas.drawRoundRect(RectF(x,y,right,bottom),8f,8f,bg)
+            canvas.save()
+            canvas.clipRect(x,y,right,bottom)
+            val available = right - x
+            val text = names[tile.name] ?: tile.name
+            val textSize = title.textSize
+            title.textSize = minOf(textSize, (available - 12f) /
+                (title.measureText(text).coerceAtLeast(1f) / textSize))
+                .coerceAtLeast(8f)
+            canvas.drawText(text, x+6f, y+(bottom-y)*0.42f, title)
+            title.textSize = textSize
+            details[tile.name]?.let {
+                val base = subtitle.textSize
+                subtitle.textSize = minOf(base, (available-12f) /
+                    (subtitle.measureText(it).coerceAtLeast(1f)/base))
+                    .coerceAtLeast(8f)
+                canvas.drawText(it, x+6f, y+(bottom-y)*0.72f, subtitle)
+                subtitle.textSize = base
+            }
+            canvas.restore()
         }
     }
 
@@ -440,6 +480,10 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
     }
 
     fun stop() {
+        if (receiverRegistered) {
+            runCatching { context.unregisterReceiver(configReceiver) }
+            receiverRegistered = false
+        }
         generation++
         matchSequence++
         worker?.shutdownNow()
