@@ -15,6 +15,7 @@ class MainActivity : FlutterActivity() {
     private var pendingRoadImport: MethodChannel.Result? = null
     private var pendingRoadAppend = false
     private var pendingTopologyImport = false
+    private var pendingGpxImport: MethodChannel.Result? = null
     private var pendingTrafficImport: MethodChannel.Result? = null
     private var pendingTrafficAppend = true
     private var phoneMapPreviewFactory: PhoneMapPreviewFactory? = null
@@ -171,6 +172,26 @@ class MainActivity : FlutterActivity() {
                         }
                     }
                 }
+                "reviewGpxTrack" -> {
+                    if (pendingGpxImport != null) {
+                        result.error("ALREADY_IMPORTING", "Đang chọn tệp GPX", null)
+                    } else {
+                        pendingGpxImport = result
+                        try {
+                            val picker = Intent(Intent.ACTION_OPEN_DOCUMENT)
+                                .addCategory(Intent.CATEGORY_OPENABLE)
+                                .setType("*/*")
+                                .putExtra(Intent.EXTRA_MIME_TYPES, arrayOf(
+                                    "application/gpx+xml", "application/xml", "text/xml",
+                                    "application/octet-stream"
+                                ))
+                            startActivityForResult(picker, GPX_REVIEW_REQUEST)
+                        } catch (e: Exception) {
+                            pendingGpxImport = null
+                            result.error("PICKER_UNAVAILABLE", e.message, null)
+                        }
+                    }
+                }
                 "importRoadTopologyGeoJson" -> {
                     if (pendingRoadImport != null) {
                         result.error("ALREADY_IMPORTING", "Đang chọn tệp đường", null)
@@ -249,6 +270,47 @@ class MainActivity : FlutterActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == GPX_REVIEW_REQUEST) {
+            val pending = pendingGpxImport ?: return
+            pendingGpxImport = null
+            val uri = if (resultCode == Activity.RESULT_OK) data?.data else null
+            if (uri == null) {
+                pending.success(null)
+                return
+            }
+            thread(name = "OfflineGpxReview") {
+                try {
+                    val bytes = contentResolver.openInputStream(uri)?.use { input ->
+                        val out = java.io.ByteArrayOutputStream()
+                        val buffer = ByteArray(16_384)
+                        while (true) {
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            require(out.size() + count <= 8_000_000) { "GPX vượt 8 MB" }
+                            out.write(buffer, 0, count)
+                        }
+                        out.toByteArray()
+                    } ?: throw IllegalArgumentException("Không đọc được GPX")
+                    val parsed = vn.g98g00107.thanhtaxixanh.driver.car.GpxTraceParser
+                        .parse(bytes.toString(Charsets.UTF_8))
+                    val motion = vn.g98g00107.thanhtaxixanh.driver.car.GpxMotionEstimator
+                        .enrich(parsed)
+                    val summary = mapOf(
+                        "status" to "UNVERIFIED_REVIEW_ONLY",
+                        "points" to parsed.fixes.size,
+                        "rejected" to parsed.rejectedPoints,
+                        "headings" to motion.inferredHeadings,
+                        "uncertain" to motion.uncertainPoints
+                    )
+                    runOnUiThread { pending.success(summary) }
+                } catch (e: Exception) {
+                    runOnUiThread {
+                        pending.error("INVALID_GPX", e.message ?: "GPX không hợp lệ", null)
+                    }
+                }
+            }
+            return
+        }
         if (requestCode == TRAFFIC_POINT_IMPORT_REQUEST) {
             val pending = pendingTrafficImport ?: return
             pendingTrafficImport = null
@@ -374,5 +436,6 @@ class MainActivity : FlutterActivity() {
         private const val LOCATION_PERMISSION_CODE = 4281
         private const val ROAD_IMPORT_REQUEST = 4282
         private const val TRAFFIC_POINT_IMPORT_REQUEST = 4283
+        private const val GPX_REVIEW_REQUEST = 4284
     }
 }
