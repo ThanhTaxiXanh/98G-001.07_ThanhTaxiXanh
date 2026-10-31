@@ -648,10 +648,10 @@ class _SettingsHomeState extends State<SettingsHome> {
           '${gpxReview!['rejected']} điểm loại · '
           '${gpxReview!['headings']} hướng suy ra · '
           '${gpxReview!['uncertain']} điểm chưa chắc chắn. '
-          'Ứng viên đường: ${gpxReview![\'coverageCandidate\']} · '
-          'Không tìm thấy: ${gpxReview![\'coverageMissing\']} · '
-          'Đường song song/mơ hồ: ${gpxReview![\'coverageAmbiguous\']} · '
-          'Quá nhiều ứng viên: ${gpxReview![\'coverageOverloaded\']}. '
+          'Ứng viên đường: ${gpxReview!['coverageCandidate']} · '
+          'Không tìm thấy: ${gpxReview!['coverageMissing']} · '
+          'Đường song song/mơ hồ: ${gpxReview!['coverageAmbiguous']} · '
+          'Quá nhiều ứng viên: ${gpxReview!['coverageOverloaded']}. '
           'Chỉ phân tích, chưa xác nhận đoạn đường.'),
     if (roadStatus['available'] == true)
       OutlinedButton.icon(
