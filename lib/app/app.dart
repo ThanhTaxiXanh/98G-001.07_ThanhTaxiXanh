@@ -51,6 +51,7 @@ class SettingsHome extends StatefulWidget {
 class _SettingsHomeState extends State<SettingsHome> {
   int tab = 0;
   Grid12Layout? draftLayout;
+  bool liveMapEnabled = false;
   String layoutError = '';
   final bin = TextEditingController();
   final account = TextEditingController();
@@ -380,7 +381,37 @@ class _SettingsHomeState extends State<SettingsHome> {
     const Text('Chỉnh bố cục trên điện thoại, không phải giao diện '
         'Android Auto đã được phép phát hành.'),
     const SizedBox(height: 10),
+    SwitchListTile.adaptive(
+      key: const Key('live-map-toggle'),
+      contentPadding: EdgeInsets.zero,
+      title: const Text('Bật bản đồ MapLibre động (điện thoại)'),
+      subtitle: const Text('Bản đồ tương tác cần mạng để tải lớp nền; '
+          'chỉ tạo MapView khi bật và hủy khi tắt. Không thay Android Auto.'),
+      value: liveMapEnabled,
+      onChanged: (enabled) => setState(() => liveMapEnabled = enabled),
+    ),
+    if (liveMapEnabled) ...[
+      SwitchListTile.adaptive(
+        key: const Key('map-3d-toggle'),
+        contentPadding: EdgeInsets.zero,
+        title: const Text('Góc nhìn nghiêng 3D (48°)'),
+        subtitle: const Text('Chỉ thay đổi góc camera, không cam kết nhà 3D.'),
+        value: c.map3d,
+        onChanged: (value) => unawaited(widget.store.update(
+            c.copyWith(map3d: value))),
+      ),
+      if (locationGranted != true)
+        OutlinedButton.icon(
+          onPressed: () => unawaited(_requestLocationPermission()),
+          icon: const Icon(Icons.location_on_outlined),
+          label: const Text('Cấp quyền GPS cho bản đồ động'),
+        ),
+      const Text('FPS là số khung hình thực tế đo gần đây khi bản đồ '
+          'đang hoạt động; Java/Native Heap là bộ nhớ cấp phát của tiến trình, '
+          'không phải tổng RAM của ứng dụng.'),
+    ],
     CarPreview(
+      liveMap: liveMapEnabled,
       config: draftLayout == null ? c :
           c.copyWith(customLayout: draftLayout, useCustomLayout: true),
       vietQrPayload: qrPayload,
