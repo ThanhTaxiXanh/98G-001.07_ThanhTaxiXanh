@@ -94,11 +94,15 @@ class _SettingsHomeState extends State<SettingsHome> {
   Future<void> _checkLocationPermission() async {
     try {
       final granted = await locationChannel.invokeMethod<bool>('getLocationPermission');
-      if (mounted) setState(() => locationGranted = granted ?? false);
+      if (mounted) {
+        setState(() => locationGranted = granted ?? false);
+      }
     } on MissingPluginException {
       // Widget tests or non-Android preview.
     } on PlatformException catch (e) {
-      if (mounted) setState(() => locationError = e.message ?? 'Không kiểm tra được GPS');
+      if (mounted) {
+        setState(() => locationError = e.message ?? 'Không kiểm tra được GPS');
+      }
     }
   }
 
@@ -113,9 +117,13 @@ class _SettingsHomeState extends State<SettingsHome> {
         });
       }
     } on MissingPluginException {
-      if (mounted) setState(() => locationError = 'Chỉ cấp quyền trên thiết bị Android.');
+      if (mounted) {
+        setState(() => locationError = 'Chỉ cấp quyền trên thiết bị Android.');
+      }
     } on PlatformException catch (e) {
-      if (mounted) setState(() => locationError = e.message ?? 'Yêu cầu GPS không thành công');
+      if (mounted) {
+        setState(() => locationError = e.message ?? 'Yêu cầu GPS không thành công');
+      }
     }
   }
 
