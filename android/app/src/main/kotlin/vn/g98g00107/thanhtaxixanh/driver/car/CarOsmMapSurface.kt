@@ -436,6 +436,49 @@ class CarOsmMapSurface(private val context: Context) : SurfaceCallback {
             canvas.drawRoundRect(RectF(x,y,right,bottom),8f,8f,bg)
             canvas.save()
             canvas.clipRect(x,y,right,bottom)
+            if (tile.name == "calendar") {
+                val h = bottom - y
+                val day = today.dayOfMonth.toString()
+                val weekend = today.dayOfWeek.value >= 6
+                val numberPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = if (weekend) Color.rgb(244, 94, 92)
+                        else Color.WHITE
+                    isFakeBoldText = true
+                    textSize = minOf(h * 0.62f, (right - x) * 0.27f)
+                        .coerceAtLeast(12f)
+                }
+                val infoPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.WHITE
+                    textSize = (h * 0.19f).coerceIn(9f, 19f)
+                }
+                val lunarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.rgb(255, 197, 69)
+                    textSize = (h * 0.16f).coerceIn(8f, 16f)
+                }
+                val startX = x + 9f
+                val infoX = startX + numberPaint.measureText(day) + 11f
+                val infoWidth = (right - infoX - 8f).coerceAtLeast(1f)
+                val dayName = today.dayOfWeek.getDisplayName(
+                    java.time.format.TextStyle.FULL,
+                    java.util.Locale.forLanguageTag("vi-VN"))
+                val monthName = "Tháng ${today.monthValue}, ${today.year}"
+                val lunarName = "ÂL: ${lunar.day}/${lunar.month}${lunarSuffix}"
+                val yearName = LunarCalendar.canChi(lunar.year)
+                fun fit(p: Paint, value: String) {
+                    p.textSize = minOf(p.textSize,
+                        p.textSize * infoWidth /
+                            p.measureText(value).coerceAtLeast(1f))
+                }
+                fit(infoPaint, monthName)
+                fit(lunarPaint, lunarName + " " + yearName)
+                canvas.drawText(day, startX, y + h * 0.66f, numberPaint)
+                canvas.drawText(dayName, infoX, y + h * 0.31f, infoPaint)
+                canvas.drawText(monthName, infoX, y + h * 0.53f, infoPaint)
+                canvas.drawText(lunarName + " " + yearName,
+                    infoX, y + h * 0.77f, lunarPaint)
+                canvas.restore()
+                continue
+            }
             val available = right - x
             val text = names[tile.name] ?: tile.name
             val textSize = title.textSize
