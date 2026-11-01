@@ -1,0 +1,14 @@
+# Giới hạn
+
+Phiên bản M3 có MapLibre OSM snapshot và nhập dữ liệu maxspeed GeoJSON theo vùng; chưa được kiểm tra Android Auto trên xe thật. Chưa có routing, cơ sở biển báo/camera toàn quốc, lịch nhắc tự động, audio engine, SQLite hay port YouTube. Surface xe là bản đồ 2D nhưng CHƯA PHẢI dashboard 2 cột 3 hàng tùy biến. Android Auto không cho đặt tự do widget Flutter 2 cột/3 hàng. Chưa có bằng chứng kết nối xe thật. QR phải quét kiểm thử thực; số tài khoản và BIN người dùng tự nhập. Luật tốc độ cần tái kiểm tra trước phát hành. Không tích hợp KingInstaller hoặc bypass an toàn.
+
+M2: sự kiện cá nhân có CRUD lưu JSON trong SharedPreferences (`calendar_custom_events_v1`), hỗ trợ ngày âm/dương và tính lần tới; **chưa phải SQLite**, chưa có nhắc việc tự động hoặc migrations. Bộ ngày lễ mặc định được mở rộng theo `Events.txt` của người dùng.
+
+
+M2 OSM snapshot map: renderer is implemented but Android Auto host rendering is PENDING_DEVICE_TEST. Internet connection is required for uncached tiles; MapLibre tile cache is not an offline region. GPS needs permission on phone. Speed limit remains UNKNOWN until verified sign/OSM road matching is connected. CAR_EXACT_DASHBOARD_SUCCESS remains BLOCKED_BY_PLATFORM.
+
+M4 vẫn dùng GeoJSON giới hạn 8 MB và 50.000 đoạn; chỉ **khả năng truy vấn** dùng SQLite RTree, chưa có nhập dữ liệu Việt Nam quy mô lớn hoặc xác minh biển báo trên xe thật. Bộ kiểm thử SQLite chạy Robolectric chưa thay thế Android instrumentation.
+
+M4.2: nhận diện bản sao đoạn đường từ các tệp khác nhau nhưng không tự sửa mâu thuẫn maxspeed, không khử bản sao có sẵn từ dữ liệu cũ và không bảo đảm dữ liệu OSM đã kiểm chứng tại hiện trường.
+
+M4.3 bổ sung rà soát chỉ mục và dọn bản sao chính xác từ dữ liệu cũ có xác nhận người dùng. Báo cáo không xác minh giới hạn tốc độ tại hiện trường; thao tác không tự chọn giữa các nguồn OSM mâu thuẫn. Chưa nghiệm thu xe thật hay hiệu năng với đủ 1 triệu đoạn.

@@ -1,0 +1,71 @@
+name: CI • Flutter Android
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  debug-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.0"
+          channel: stable
+          cache: true
+      - name: Generate missing platform scaffolding (no overwrite)
+        run: flutter create --platforms=android --org vn.g98g00107.thanhtaxixanh --project-name thanhtaxixanh_driver .
+      - name: Remove generated starter test (actual tests are tracked)
+        run: rm -f test/widget_test.dart
+      - name: Resolve dependencies
+        run: flutter pub get
+      - name: Format workspace then verify
+        run: |
+          dart format lib test
+          dart format --output=none --set-exit-if-changed lib test
+      - name: Static analysis
+        run: flutter analyze
+      - name: Unit + Widget tests
+        run: flutter test
+      - name: Build debug APK
+        run: flutter build apk --debug
+      - name: Verify APK archive, manifest and debug signature
+        run: |
+          set -euo pipefail
+          APK="build/app/outputs/flutter-apk/app-debug.apk"
+          test -s "$APK"
+          unzip -t "$APK" | tail -n 2
+          test -n "${ANDROID_HOME:-}"
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          "$BUILD_TOOLS/aapt" dump badging "$APK" | grep -E "^(package:|sdkVersion:|targetSdkVersion:|native-code:)"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK"
+          sha256sum "$APK" | tee build/app/outputs/flutter-apk/app-debug.apk.sha256
+      - name: Upload APK checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: ThanhTaxiXanh-debug-apk-sha256
+          path: build/app/outputs/flutter-apk/app-debug.apk.sha256
+          if-no-files-found: error
+      - name: Unit tests for native OSM speed matching
+        run: |
+          cd android
+          if ! ./gradlew :app:testDebugUnitTest --no-daemon; then
+            echo "::group::Android unit test XML stack traces"
+            find ../build -path '*/test-results/testDebugUnitTest/*.xml' -type f -print -exec cat {} \; || true
+            echo "::endgroup::"
+            exit 1
+          fi
+      - name: Upload installable debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ThanhTaxiXanh-debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error

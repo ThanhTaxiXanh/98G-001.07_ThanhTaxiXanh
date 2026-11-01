@@ -1,0 +1,52 @@
+name: Signed release APK
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    if: ${{ github.ref == 'refs/heads/main' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.0"
+          channel: stable
+      - name: Generate scaffold
+        run: flutter create --platforms=android --org vn.g98g00107.thanhtaxixanh --project-name thanhtaxixanh_driver .
+      - name: Prepare signing material (required secrets)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$KEYSTORE_BASE64" && test -n "$ALIAS" && test -n "$STORE_PASSWORD" && test -n "$KEY_PASSWORD"
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > android/app/release-key.jks
+          {
+            echo "storeFile=release-key.jks"
+            echo "storePassword=$STORE_PASSWORD"
+            echo "keyAlias=$ALIAS"
+            echo "keyPassword=$KEY_PASSWORD"
+          } > android/key.properties
+          chmod 600 android/key.properties android/app/release-key.jks
+      - name: Build release APK
+        run: flutter build apk --release
+      - name: SHA256
+        run: sha256sum build/app/outputs/flutter-apk/app-release.apk
+      - name: Upload signed APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ThanhTaxiXanh-signed-release
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+      - name: Remove signing materials
+        if: always()
+        run: rm -f android/key.properties android/app/release-key.jks

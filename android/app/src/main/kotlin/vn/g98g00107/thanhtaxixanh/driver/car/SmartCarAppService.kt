@@ -1,0 +1,76 @@
+package vn.g98g00107.thanhtaxixanh.driver.car
+
+import android.content.Intent
+import android.util.Log
+import androidx.car.app.AppManager
+import androidx.car.app.CarAppService
+import androidx.car.app.Screen
+import androidx.car.app.Session
+import androidx.car.app.model.Action
+import androidx.car.app.model.ActionStrip
+import androidx.car.app.navigation.model.NavigationTemplate
+import androidx.car.app.model.Template
+import androidx.car.app.validation.HostValidator
+import android.content.pm.ApplicationInfo
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+
+/**
+ * Android Auto projection entry point. No arbitrary Flutter widgets on AA.
+ * Host chrome and visible map viewport are controlled by Android Auto.
+ */
+class SmartCarAppService : CarAppService() {
+    override fun createHostValidator(): HostValidator =
+        if ((applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0) HostValidator.ALLOW_ALL_HOSTS_VALIDATOR
+        else HostValidator.Builder(this)
+            .addAllowedHosts(androidx.car.app.R.array.hosts_allowlist_sample)
+            .build()
+
+    override fun onCreateSession(): Session = SmartSession()
+}
+
+private class SmartSession : Session() {
+    private lateinit var mapSurface: CarOsmMapSurface
+    override fun onCreateScreen(intent: Intent): Screen {
+        Log.i("ThanhTaxiCar", "AA session created; OSM surface awaits host")
+        mapSurface = CarOsmMapSurface(carContext)
+        carContext.getCarService(AppManager::class.java)
+            .setSurfaceCallback(mapSurface)
+        val screen = object : Screen(carContext) {
+            override fun onGetTemplate(): Template =
+                NavigationTemplate.Builder()
+                    .setActionStrip(
+                        ActionStrip.Builder()
+                            .addAction(
+                                Action.Builder()
+                                    .setTitle("Phóng to")
+                                    .setOnClickListener {
+                                        mapSurface.zoomBy(1.0)
+                                    }
+                                    .build()
+                            )
+                            .addAction(
+                                Action.Builder()
+                                    .setTitle("Thu nhỏ")
+                                    .setOnClickListener { mapSurface.zoomBy(-1.0) }
+                                    .build()
+                            )
+                            .build()
+                    )
+                    .build()
+        }
+        screen.lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onDestroy(owner: LifecycleOwner) {
+                // Some hosts do not deliver SurfaceDestroyed on every exit.
+                mapSurface.stop()
+                CarSurfaceTelemetry.record(carContext, "sessionStopped", 0, 0,
+                    null, null)
+                runCatching {
+                    carContext.getCarService(AppManager::class.java)
+                        .setSurfaceCallback(null)
+                }.onFailure { Log.w("ThanhTaxiCar", "Clear host callback failed", it) }
+            }
+        })
+        return screen
+    }
+}
